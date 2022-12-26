@@ -1,0 +1,3 @@
+{"model_path": "saved_models/sahp-synthetic_hidden16-20221210-135640.pth", "data_path": ["../data/hawkes_synthetic_20221210-135309/exp_10d_0.pkl", "../data/hawkes_synthetic_20221210-135309/exp_10d_1.pkl"]}
+{"model_path": "saved_models/sahp-synthetic_hidden16-20221210-140103.pth", "data_path": ["../data/hawkes_synthetic_20221210-135905/exp_10d_0.pkl", "../data/hawkes_synthetic_20221210-135905/exp_10d_1.pkl"]}
+{"model_path": "saved_models/sahp-synthetic_hidden16-20221210-140800.pth", "data_path": ["../data/hawkes_synthetic_20221210-140656/exp_10d_0.pkl", "../data/hawkes_synthetic_20221210-140656/exp_10d_1.pkl"]}

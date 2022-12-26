@@ -1,0 +1,19 @@
+# 有向无权图
+# model_param = torch.load("./Joint_sahp/saved_models/sahp-synthetic_hidden16-20221224-110241.pth")
+# 有向无权图带OT约束
+# model_param = torch.load("./Joint_sahp/saved_models/sahp-synthetic_hidden16-20221224-180027.pth")
+# 有向有权图
+# model_param = torch.load("./Joint_sahp/saved_models/sahp-synthetic_hidden16-20221224-110417.pth")
+# 有向有权图带OT约束
+# model_param = torch.load("./Joint_sahp/saved_models/sahp-synthetic_hidden16-20221224-110455.pth")
+# aligned_data = np.load("./data/ER_10_10/pairs_0.2_directed.npz")
+
+# 无向无权图
+model_param = torch.load("./Joint_sahp/saved_models/sahp-synthetic_hidden16-20221224-181252.pth")
+# 无向无权图带OT约束
+# model_param = torch.load("./Joint_sahp/saved_models/sahp-synthetic_hidden16-20221224-180425.pth")
+# 无向有权图
+# model_param = torch.load("./Joint_sahp/saved_models/sahp-synthetic_hidden16-20221224-181054.pth")
+# 无向有权图带OT约束
+# model_param = torch.load("./Joint_sahp/saved_models/sahp-synthetic_hidden16-20221224-180748.pth")
+aligned_data = np.load("./data/ER_10_10/pairs_0.2_undirected.npz")
