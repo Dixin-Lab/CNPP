@@ -44,9 +44,11 @@ sigma(F2(sigma(F1(x))))
 
 核心代码 sahp.py
 
-![image-20230112200529403](C:\Users\14024\AppData\Roaming\Typora\typora-user-images\image-20230112200529403.png)
+![image-20230112200529403](https://github.com/Zephyr-29/TPP-Align/image-20230112200529403.png)
 
-![image-20230112200651099](C:\Users\14024\AppData\Roaming\Typora\typora-user-images\image-20230112200651099.png)
+![image-20230112200651099](https://github.com/Zephyr-29/TPP-Align/image-20230112200651099.png)
+
+
 
 loss function=nll **无正则**
 
@@ -91,11 +93,11 @@ loss function=nll
 2. loss=nll+正则 
 2.  是否可以只学tpp，loss=nll，得到X1或X1  X2作为节点的初始化，然后作为初始化在送到什么地方做后续的图匹配。但感觉，用tpp学出的emb做初始化应该不如目标明确的那个deep walk，node2vec 专门提取图的结构特征的方法好。
 
-4. gumbel_sinkhorn 两个参水 tau(温度)，iter(迭代次数)。控制这两个参数可以使得P硬或软。硬只里面接近只有01元素，软指里面全是0.几 0.几 0.几（懂我意思 /doge) 考虑到我们将P作为最终的prediction 结果。在硬的时候，top1有意义，感觉top3 5 没意义，都是10(-20)了，在软的时候，top1 3 5都有意义。
+4. gumbel_sinkhorn 两个参水 tau(温度)，iter(迭代次数)。控制这两个参数可以使得P硬或软。硬只里面接近只有01元素，软指里面全是0.几 0.几 0.几（懂我意思 /doge) 考虑到我们将P作为最终的prediction 结果。在硬的时候，top1有意义，感觉top3 5 没意义，都是10(-20)了，在软的时候，top1 3 5都有
 
 ### For许老师debug：
 
-![image-20230112202421518](C:\Users\14024\AppData\Roaming\Typora\typora-user-images\image-20230112202421518.png)
+![image-20230112202421518](https://github.com/Zephyr-29/TPP-Align/image-20230112202421518.png)
 
 与然哥上传的第一版代码相比，只有这5个文件是新增or变化的。
 
