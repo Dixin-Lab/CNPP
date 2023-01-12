@@ -44,9 +44,9 @@ sigma(F2(sigma(F1(x))))
 
 核心代码 sahp.py
 
-![image-20230112200529403](https://github.com/Zephyr-29/TPP-Align/image-20230112200529403.png)
+![image-20230112200529403](https://github.com/Zephyr-29/TPP-Align/blob/main/image-20230112200529403.png)
 
-![image-20230112200651099](https://github.com/Zephyr-29/TPP-Align/image-20230112200651099.png)
+![image-20230112200651099](https://github.com/Zephyr-29/TPP-Align/blob/main/image-20230112200651099.png)
 
 
 
@@ -97,7 +97,7 @@ loss function=nll
 
 ### For许老师debug：
 
-![image-20230112202421518](https://github.com/Zephyr-29/TPP-Align/image-20230112202421518.png)
+![image-20230112202421518](https://github.com/Zephyr-29/TPP-Align/blob/main/image-20230112202421518.png)
 
 与然哥上传的第一版代码相比，只有这5个文件是新增or变化的。
 
