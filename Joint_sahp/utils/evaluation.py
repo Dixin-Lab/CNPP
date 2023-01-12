@@ -1,6 +1,6 @@
 import numpy as np
 import tqdm
-from models.base import SeqGenerator
+from Joint_sahp.models.base import SeqGenerator
 
 
 def generate_multiple_sequences(generator: SeqGenerator, tmax: float, n_gen_seq: int = 100):

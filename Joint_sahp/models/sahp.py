@@ -8,36 +8,71 @@ import torch.nn.functional as F
 import numpy as np
 import math, copy
 
-from models.embedding.event_type import TypeEmbedding
-from models.embedding.position import PositionalEmbedding,BiasedPositionalEmbedding
-from models.embedding.event_embedding import EventEmbedding
-from models.attention.multi_head import MultiHeadedAttention
-from models.utils.sublayer import SublayerConnection
-from models.utils.feed_forward import PositionwiseFeedForward
-from models.base import SeqGenerator, predict_from_hidden
-from models.utils.gelu import GELU
+from Joint_sahp.models.embedding.event_type import TypeEmbedding
+from Joint_sahp.models.embedding.position import PositionalEmbedding,BiasedPositionalEmbedding
+from Joint_sahp.models.embedding.event_embedding import EventEmbedding
+from Joint_sahp.models.attention.multi_head import MultiHeadedAttention
+from Joint_sahp.models.utils.sublayer import SublayerConnection
+from Joint_sahp.models.utils.feed_forward import PositionwiseFeedForward
+from Joint_sahp.models.base import SeqGenerator, predict_from_hidden
+from Joint_sahp.models.utils.gelu import GELU
 
 from matplotlib import pyplot as plt
+def map_index(seq,dic,base):
+    #print("sahp,dic",dic)
+    l_seq=seq.reshape(-1)
+    l=len(l_seq)
+    res_seq=torch.zeros_like(l_seq)
+    for i in range(l):
+        if l_seq[i].item() in dic.keys():
+            res_seq[i]=dic[l_seq[i].item()]
+        else:
+            res_seq[i]=base
+            #print("base")
+    return res_seq.reshape(seq.shape).int()
 
 class SAHP(nn.Module):
     "Generic N layer attentive Hawkes with masking"
 
-    def __init__(self, nLayers, d_model, atten_heads, dropout, process_dim, device, max_sequence_length):
+    def __init__(self, nLayers, d_model, atten_heads, dropout, process_dim, device, max_sequence_length,tau=0.1,n_sink_iter=20):
         super(SAHP, self).__init__()
+
+
         self.process_num = len(process_dim)
         self.nLayers = nLayers
         self.process_dim = process_dim
         self.input_size = [ x + 1 for x in process_dim]
+        print("self.input_size  ",self.input_size)
         self.query_size = d_model // atten_heads
         self.device = device
         self.gelu = GELU()
 
         self.d_model = d_model
         self.type_emb_list = nn.ModuleList([])
-        for i in range(self.process_num):
-            self.type_emb_list.append(TypeEmbedding(self.input_size[i], d_model, padding_idx=self.process_dim[i]))
-        self.position_emb = BiasedPositionalEmbedding(d_model=d_model,max_len = max_sequence_length)
+        print("self.process_dim[i]   ",self.process_dim)
+        for i in range(self.process_num):#2共用
+            self.type_emb_list.append(
+                TypeEmbedding(self.input_size[i], d_model, padding_idx=self.process_dim[i]))
 
+        self.shared_embedding = TypeEmbedding(self.input_size[0], d_model, padding_idx=self.process_dim[0])
+
+
+        self.P = None
+        self.f = nn.Sequential(
+            nn.Linear(self.d_model,self.d_model, bias=True),
+             nn.ReLU(),
+            nn.Linear(self.d_model, self.input_size[1], bias=True),
+            nn.ReLU()
+        )
+        self.X1=nn.Parameter(torch.FloatTensor(self.input_size[0],d_model))
+        print("X1 shape  ",self.X1.shape)
+        nn.init.normal_(self.X1)
+        self.tau=tau
+        self.n_sink_iter=n_sink_iter
+
+
+
+        self.position_emb = BiasedPositionalEmbedding(d_model=d_model,max_len = max_sequence_length)
         self.attention = MultiHeadedAttention(h=atten_heads, d_model=self.d_model)
         self.feed_forward = PositionwiseFeedForward(d_model=self.d_model, d_ff=self.d_model * 4, dropout=dropout)
         self.input_sublayer = SublayerConnection(size=self.d_model, dropout=dropout)
@@ -69,10 +104,24 @@ class SAHP(nn.Module):
     def state_decay(self, converge_point, start_point, omega, duration_t):
         # * element-wise product
         cell_t = torch.tanh(converge_point + (start_point - converge_point) * torch.exp(- omega * duration_t))
-        return cell_t
+        return cell_t #softplus??
+
+    def get_P(self,):
+        from Joint_sahp.models.utils.sinkhorn import gumbel_sinkhorn
+
+        return gumbel_sinkhorn(self.f(self.X1).T, tau=self.tau, n_iter=self.n_sink_iter)
 
     def forward(self, process_idx, seq_dt, seq_types, src_mask):
-        type_embedding = self.type_emb_list[process_idx](seq_types) * math.sqrt(self.d_model)  #
+        if process_idx==0:
+            type_embedding = self.X1[seq_types] * math.sqrt(self.d_model)
+        else:
+            self.P=self.get_P()
+            X2=self.P@(self.X1.detach())
+            type_embedding = X2[seq_types] * math.sqrt(self.d_model)
+        #type_embedding=self.type_emb_list[process_idx](seq_types) * math.sqrt(self.d_model)
+        # from Joint_sahp.models.utils.sinkhorn import gumbel_sinkhorn
+        # self.P=gumbel_sinkhorn(self.type_emb_list[0].weight[:-1]@self.type_emb_list[0].weight[:-1].T, tau=self.tau, n_iter=self.n_sink_iter)
+
         position_embedding = self.position_emb(seq_types,seq_dt)
 
         x = type_embedding + position_embedding
@@ -81,6 +130,8 @@ class SAHP(nn.Module):
             x = self.dropout(self.output_sublayer(x, self.feed_forward))
 
         embed_info = x
+
+
 
         self.start_point = self.start_layer(embed_info)
         self.converge_point = self.converge_layer(embed_info)
@@ -171,7 +222,7 @@ class SAHP(nn.Module):
         next_dt = dt_seq_valid[length - 1]
 
         seq_types_valid = seq_types[1:length + 1]  # include the first added event
-        from train_functions.train_sahp import MaskBatch
+        from Joint_sahp.train_functions.train_sahp import MaskBatch
         last_type = seq_types[length-1]
         next_type = seq_types[length]
         if next_type == self.process_dim:
@@ -239,7 +290,7 @@ class SAHP(nn.Module):
             return intens_at_evs_lst
 
     def intensity_per_type(self, seq_types, dt_seq, sample_times, timestamps, type):
-        from train_functions.train_sahp import MaskBatch
+        from Joint_sahp.train_functions.train_sahp import MaskBatch
 
         intens_at_samples = []
         with torch.no_grad():

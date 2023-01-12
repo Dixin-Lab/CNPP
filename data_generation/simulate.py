@@ -84,13 +84,16 @@ def simulate_ogata_thinning(mu, infect, num_seq: int, max_time: float = 5.0, w: 
             seqs.append(sequence)
         
     print('Seqs_len: ', seqs_len)
+    print('Seqs: ', seqs)
     return seqs, seqs_len
     
     
 def make_seq(process_idx, data, num_seq, max_time, w, output_dir='.'):
     data = torch.Tensor(data)
     event_type = data.shape[0]
-    mu = torch.ones(event_type, dtype=torch.float32) / event_type
+    mu=torch.sum(data,dim=0)/torch.sum(data)
+    #mu = torch.ones(event_type, dtype=torch.float32) / event_type
+    print("mu",mu)
     # deg = torch.sum(data, dim=1)
     # mu = torch.where(deg > 0, deg, torch.tensor(eps, dtype=torch.float32)) / torch.sum(data)
     # mu = torch.zeros(event_type, dtype=torch.float32)

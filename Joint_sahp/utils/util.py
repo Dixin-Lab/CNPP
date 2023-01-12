@@ -4,7 +4,7 @@
 
 import torch
 from torch import nn
-from utils.load_synth_data import one_hot_embedding
+from Joint_sahp.utils.load_synth_data import one_hot_embedding
 
 def get_batch(batch_size, i_batch, process_dim, seq_lengths, seq_times, seq_types, rnn = True):
     start_pos = i_batch

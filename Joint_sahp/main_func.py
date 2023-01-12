@@ -12,10 +12,10 @@ from torch import autograd
 from utils.load_synth_data import process_loaded_sequences
 from train_functions.train_sahp import make_model, train_eval_sahp
 
-DEFAULT_BATCH_SIZE = 32
+DEFAULT_BATCH_SIZE = 16
 DEFAULT_HIDDEN_SIZE = 16
-DEFAULT_LEARN_RATE = 5e-5
-
+DEFAULT_LEARN_RATE = 1e-5
+#5e-5
 parser = argparse.ArgumentParser(description="Train the models.")
 parser.add_argument('-e', '--epochs', type=int, default = 1000,
                     help='number of epochs.')
@@ -39,8 +39,8 @@ parser.add_argument('--lambda-l2', type=float, default=3e-4,
                     help='regularization loss.')
 parser.add_argument('--dev-ratio', type=float, default=0.1,
                     help='override the size of the dev dataset.')
-parser.add_argument('--early-stop-threshold', type=float, default=1e-2,
-                    help='early_stop_threshold')
+parser.add_argument('--early-stop-threshold', type=float, default=1e-3,
+                    help='early_stop_threshold')#不懂
 parser.add_argument('--log-dir', type=str,
                     dest='log_dir', default='logs',
                     help="training logs target directory.")
@@ -53,7 +53,7 @@ parser.add_argument('--samples', default=10,
 parser.add_argument('-m', '--model', default='sahp',
                     type=str, choices=['sahp'],
                     help='choose which models to train.')
-parser.add_argument('-t', '--task', type=str, default='retweet',
+parser.add_argument('-t', '--task', type=str, default='synthetic',
                     help = 'task type')
 args = parser.parse_args()
 print(args)
@@ -63,8 +63,15 @@ if torch.cuda.is_available():
 else:
     USE_CUDA = False
 
-SYNTH_DATA_FILES = glob.glob("../data/ER_10_90/weighted_directed/exp_10d_*.pkl")
-ALIGNED_DATA_FILE = "../data/ER_10_90/pairs_0.2_directed.npz"
+# SYNTH_DATA_FILES = glob.glob("../data/ER_100_1000/unweighted_undirected/*.pkl")
+# ALIGNED_DATA_FILE = "../data/ER_100_1000/pairs.npz"
+
+# SYNTH_DATA_FILES = glob.glob("../data/ER_10_90/unweighted_undirected/*.pkl")
+# ALIGNED_DATA_FILE = "../data/ER_10_90/pairs.npz"
+
+SYNTH_DATA_FILES = glob.glob("../data/ER_10_90/weighted_directed/*.pkl")
+ALIGNED_DATA_FILE = "../data/ER_10_90/pairs.npz"
+
 
 # SYNTH_DATA_FILES = glob.glob("../data/hawkes_phone-email/*.pkl")
 # ALIGNED_DATA_FILE = "../data/hawkes_phone-email/phone-email_0.1.npz"
@@ -74,13 +81,28 @@ SYNTHETIC_TASKS = ['synthetic', 'phone-email']
 
 start_time = time.time()
 
+import random
+def setup_seed(seed):
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+    np.random.seed(seed)
+    random.seed(seed)
+    torch.backends.cudnn.deterministic = True
+
+
+
+
 if __name__ == '__main__':
+
+    setup_seed(500)
     cuda_num = 'cuda:{}'.format(args.cuda)
     device = torch.device(cuda_num if USE_CUDA else 'cpu')
+    #device = torch.device('cpu')
     print("Training on device {}".format(device))
 
     process_dim = TYPE_SIZE_DICT[args.task]
     print("Loading {} and {}-dimensional process.".format(process_dim[0], process_dim[1]), end=' \n')
+
 
     if args.task in SYNTHETIC_TASKS:
         print("Available files:")
@@ -90,7 +112,11 @@ if __name__ == '__main__':
         load_aligned_data = np.load(ALIGNED_DATA_FILE)
         train_pairs = torch.LongTensor(load_aligned_data['train_pairs'] / 1.0)
         test_pairs = torch.LongTensor(load_aligned_data['test_pairs'] / 1.0)
-        # gnd_pairs = load_aligned_data['gnd']
+        gnd_pairs = torch.vstack((train_pairs,test_pairs))
+        print("gnd_pairs ",gnd_pairs)
+        print("gnd_pairs ", dict(gnd_pairs.int().numpy()))
+
+
 
         tmax_list = []
         train_seq_times_list = []
@@ -105,13 +131,14 @@ if __name__ == '__main__':
         max_seq_length_list = []
 
         for i, synth_data_file in enumerate(SYNTH_DATA_FILES):
-            print(synth_data_file)
+            print("iiii:",i,synth_data_file)
 
             with open(synth_data_file, 'rb') as f:
                 loaded_hawkes_data = pickle.load(f)
             
             mu = loaded_hawkes_data['mu']
             alpha = loaded_hawkes_data['alpha']
+            print("alpha",alpha.shape)
             decay = loaded_hawkes_data['decay']
             tmax = loaded_hawkes_data['tmax']
             print("Simulated Hawkes process parameters:")
@@ -200,12 +227,27 @@ if __name__ == '__main__':
     model = None
     if MODEL_TOKEN == 'sahp':
         # with autograd.detect_anomaly():
-            params = args, process_dim, device, tmax_list, max_seq_length_list, \
-                     train_seq_times_list, train_seq_types_list, train_seq_lengths_list, \
-                     dev_seq_times_list, dev_seq_types_list, dev_seq_lengths_list, \
-                     test_seq_times_list, test_seq_types_list, test_seq_lengths_list, \
-                     BATCH_SIZE, EPOCHS, USE_CUDA, train_pairs, test_pairs
-            model = train_eval_sahp(params)
+        topk=3
+        gamma=0
+        train_set_ratio=0.0
+        tau=0.1
+        n_sink_iter=15
+        l=len(gnd_pairs)
+
+
+        PATH="../Plot/ER_50_500_sigma(F2(sigma(F1)))_tpp_result.npz"
+        for x in train_seq_types_list:
+            print("train_seq_types_shape",x.shape)
+        for x in max_seq_length_list:
+            print("max_seq_length",x)
+        params = args, process_dim, device, tmax_list, max_seq_length_list, \
+                 train_seq_times_list, train_seq_types_list, train_seq_lengths_list, \
+                 dev_seq_times_list, dev_seq_types_list, dev_seq_lengths_list, \
+                 test_seq_times_list, test_seq_types_list, test_seq_lengths_list, \
+                 BATCH_SIZE, EPOCHS, USE_CUDA, train_pairs, test_pairs,train_set_ratio\
+            ,gnd_pairs,tau,n_sink_iter,PATH
+
+        model = train_eval_sahp(params)
 
     else:
         exit()

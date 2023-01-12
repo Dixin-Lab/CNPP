@@ -7,7 +7,7 @@ from simulate import make_seq
 
 if __name__ == '__main__':
 
-    num_nodes, num_edges = 10, 90
+    num_nodes, num_edges = 10, 80
     graph_type = 'ER'
     w_ranges=[(0.5, 2.0)]
     train_ratio = 0.2
@@ -36,12 +36,15 @@ if __name__ == '__main__':
     # graph_dict = {'unweighted_directed': [B, B_perm],
     #                 'weighted_directed': [W, W_perm]}
 
-    graph_dict = {'unweighted_undirected': [B_und, B_und_perm],
-                  'weighted_undirected': [W_und, W_und_perm]}
+    graph_dict = {#'unweighted_undirected': [B_und, B_und_perm],
+                  #'weighted_undirected': [W_und, W_und_perm],
+                  #'unweighted_directed': [B, B_perm],
+                  'weighted_directed': [W, W_perm]
+                  }
 
     # Use Ogata's thinning method and save sequence data
     num_seq = 100
-    max_time = 20.0
+    max_time = 20
     w = 1.0
     for graph_type, graph_list in graph_dict.items():
         process_num = len(graph_list)
