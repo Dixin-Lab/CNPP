@@ -19,6 +19,10 @@ def simulate_dag(d, s0, graph_type):
         G_und = nx.gnm_random_graph(n=d, m=s0)
         B_und = nx.to_numpy_array(G_und)
         B = np.tril(B_und, k=-1)
+    elif graph_type=='BA':
+        G_und = nx.barabasi_albert_graph(n=d,m=s0//d)
+        B_und = nx.to_numpy_array(G_und)
+        B = np.tril(B_und, k=-1)
     else:
         raise ValueError('unknown graph type')
     P = np.random.permutation(np.eye(B_und.shape[0]))

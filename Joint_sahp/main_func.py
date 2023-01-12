@@ -94,7 +94,7 @@ def setup_seed(seed):
 
 if __name__ == '__main__':
 
-    setup_seed(500)
+    setup_seed(200)
     cuda_num = 'cuda:{}'.format(args.cuda)
     device = torch.device(cuda_num if USE_CUDA else 'cpu')
     #device = torch.device('cpu')
@@ -129,14 +129,21 @@ if __name__ == '__main__':
         test_seq_types_list = []
         test_seq_lengths_list = []
         max_seq_length_list = []
+        mu1=None
+        mu2=None
 
         for i, synth_data_file in enumerate(SYNTH_DATA_FILES):
             print("iiii:",i,synth_data_file)
 
             with open(synth_data_file, 'rb') as f:
                 loaded_hawkes_data = pickle.load(f)
-            
+
+
             mu = loaded_hawkes_data['mu']
+            if i == 0:
+                mu1=mu
+            else:
+                mu2=mu
             alpha = loaded_hawkes_data['alpha']
             print("alpha",alpha.shape)
             decay = loaded_hawkes_data['decay']
@@ -231,7 +238,7 @@ if __name__ == '__main__':
         gamma=0
         train_set_ratio=0.0
         tau=0.1
-        n_sink_iter=15
+        n_sink_iter=25
         l=len(gnd_pairs)
 
 
@@ -245,7 +252,7 @@ if __name__ == '__main__':
                  dev_seq_times_list, dev_seq_types_list, dev_seq_lengths_list, \
                  test_seq_times_list, test_seq_types_list, test_seq_lengths_list, \
                  BATCH_SIZE, EPOCHS, USE_CUDA, train_pairs, test_pairs,train_set_ratio\
-            ,gnd_pairs,tau,n_sink_iter,PATH
+            ,gnd_pairs,tau,n_sink_iter,PATH,mu1,mu2
 
         model = train_eval_sahp(params)
 

@@ -95,7 +95,7 @@ def train_eval_sahp(params):
     test_seq_times_list, test_seq_types_list, test_seq_lengths_list, \
     batch_size, epoch_num, use_cuda, train_pairs, test_pairs,\
     train_set_ratio,gnd_pair,\
-        tau,n_sink_iter,PATH= params
+        tau,n_sink_iter,PATH,mu1,mu2= params
 
     process_num = len(tmax_list)
     max_sequence_length = max(max_seq_length_list)
@@ -132,6 +132,10 @@ def train_eval_sahp(params):
 
     last_dev_loss = 0.0
     early_step = 0
+
+    mu1=torch.tensor(mu1,dtype=torch.float32).to(device)
+    mu2=torch.tensor(mu2,dtype=torch.float32).to(device)
+    print("mu1 shape",mu1.shape)
 
     model.train()
     for epoch in range(epoch_num):
@@ -182,6 +186,16 @@ def train_eval_sahp(params):
 
                 batch_train_loss += nll
                 batch_event_num = torch.sum(batch_seq_lengths).float().item()
+
+                # print(model.get_P()[:-1,:-1].dtype)
+                # print(mu1.dtype)
+                # print(mu2.dtype)
+                # print((model.get_P()[:-1,:-1]@mu1.reshape(-1,1)).shape)
+                # print((model.get_P()[:-1, :-1] @ mu1.reshape(-1, 1)).shape)
+                ot_loss=torch.sum((model.get_P()[:-1,:-1]@mu1.reshape(-1,1)-mu2.reshape(-1,1))**2)*batch_event_num
+                #print("nll",nll,"reg",ot_loss*80)
+
+                #batch_train_loss+=ot_loss*80
                 if i==0:
                     nll_0+=nll
                     seq_num_0 += batch_event_num
@@ -254,7 +268,7 @@ def train_eval_sahp(params):
         #print(np.array(list(dic.items()))[:-1])
         l=int(len(gnd_pair)*train_set_ratio)
         for topk in [1,3,5]:#,30,50
-            acc_score_P(model.P.T.cpu().detach().numpy(), gnd=gnd_pair[:, ].numpy(), topk=topk)
+            acc_score_P(model.get_P()[:-1,:-1].T.cpu().detach().numpy(), gnd=gnd_pair[:, ].numpy(), topk=topk)
 
         if epoch%5==0:
             print(model.P)

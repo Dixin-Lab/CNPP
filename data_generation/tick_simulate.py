@@ -177,7 +177,7 @@ def make_seq(process_idx, data, num_seq, max_time, w, output_dir='.'):
     # print('SVD before: ', torch.linalg.svdvals(data)[0])
     # print('SVD after: ', torch.linalg.svdvals(infect)[0])
     # infect = data / 5
-
+    print(infect)
     get_graph_data(infect=infect.numpy(), mu=mu, w=[w], process_idx=process_idx, n_nodes=event_type,
                    num_seq=num_seq, max_time=max_time, output_dir=output_dir)
 

@@ -58,6 +58,8 @@ class SAHP(nn.Module):
 
 
         self.P = None
+
+
         self.f = nn.Sequential(
             nn.Linear(self.d_model,self.d_model, bias=True),
              nn.ReLU(),
@@ -108,15 +110,20 @@ class SAHP(nn.Module):
 
     def get_P(self,):
         from Joint_sahp.models.utils.sinkhorn import gumbel_sinkhorn
+        P_before_GS=self.f(self.X1).T
+        mask=torch.ones((self.input_size[1],self.input_size[0])).to(self.device)
+        mask[:,-1]=0
+        mask[-1,:]=0
+        P_before_GS.masked_fill(mask == 0, -1e9)
 
-        return gumbel_sinkhorn(self.f(self.X1).T, tau=self.tau, n_iter=self.n_sink_iter)
+        return gumbel_sinkhorn(P_before_GS, tau=self.tau, n_iter=self.n_sink_iter)
 
     def forward(self, process_idx, seq_dt, seq_types, src_mask):
         if process_idx==0:
             type_embedding = self.X1[seq_types] * math.sqrt(self.d_model)
         else:
-            self.P=self.get_P()
-            X2=self.P@(self.X1.detach())
+            #self.P=self.get_P()
+            X2=self.get_P()@(self.X1.detach())
             type_embedding = X2[seq_types] * math.sqrt(self.d_model)
         #type_embedding=self.type_emb_list[process_idx](seq_types) * math.sqrt(self.d_model)
         # from Joint_sahp.models.utils.sinkhorn import gumbel_sinkhorn
