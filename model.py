@@ -227,7 +227,6 @@ class Predictor(nn.Module):
 
     def __init__(self, dim, num_types):
         super().__init__()
-        # TODO
         self.linear = nn.Linear(dim, num_types, bias=False)
         nn.init.xavier_normal_(self.linear.weight)
 
@@ -418,7 +417,7 @@ class Predictor2(nn.Module):
 
     def __init__(self, dim, num_types):
         super().__init__()
-        # TODO
+        # TODO: not sure whether we need to use a similar module like CoupleEmbedding
         self.linear = nn.Linear(dim, num_types, bias=False)
         nn.init.xavier_normal_(self.linear.weight)
 
@@ -433,11 +432,11 @@ class Transformer2(nn.Module):
 
     def __init__(
             self,
-            num_types, d_model=256, d_rnn=128, d_inner=1024,
+            num_types: List, d_model=256, d_rnn=128, d_inner=1024,
             n_layers=4, n_head=4, d_k=64, d_v=64, dropout=0.1):
         super().__init__()
 
-        self.encoder = Encoder(
+        self.encoder = Encoder2(
             num_types=num_types,
             d_model=d_model,
             d_inner=d_inner,
@@ -451,7 +450,7 @@ class Transformer2(nn.Module):
         self.num_types = num_types
 
         # convert hidden vectors into a scalar
-        self.linear = nn.Linear(d_model, num_types)
+        self.linear = nn.Linear(d_model, sum(num_types))
 
         # parameter for the weight of time difference
         self.alpha = nn.Parameter(torch.tensor(-0.1))
