@@ -114,7 +114,7 @@ class SAHP(nn.Module):
         mask=torch.ones((self.input_size[1],self.input_size[0])).to(self.device)
         mask[:,-1]=0
         mask[-1,:]=0
-        P_before_GS=P_before_GS.masked_fill(mask == 0, -1e9)
+        P_before_GS=P_before_GS.masked_fill(mask == 0, -1e19)
 
         return gumbel_sinkhorn(P_before_GS, tau=self.tau, n_iter=self.n_sink_iter)
 

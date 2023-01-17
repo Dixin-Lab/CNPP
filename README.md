@@ -110,3 +110,7 @@ sahp.py  主要看init()  forward()  get_P() 三个函数就行
 train_sahp.py 加正则/测试acc
 
 metric.py 根据ground truth 测试匹配结果acc
+
+
+
+跨文件种子？？
