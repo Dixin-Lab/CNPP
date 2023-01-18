@@ -58,10 +58,15 @@ if __name__=="__main__":
     print("a:",a)
     print("b:",b)
     print("cost",cost)
-
-    P,wd=sinkhorn(cost, a, b, epsilon=0.1, precision=1e-30)
+    epsilon=0.00001
+    distribute_a=np.ones(num_types[0])/num_types[0]
+    distribute_b = np.ones(num_types[1]) / num_types[1]
+    P,wd=sinkhorn(cost, distribute_a,distribute_b, epsilon=epsilon, precision=1e-30)
+    np.savez("P_prior"+str(epsilon)+".npz",P=P)
+    print("P",sum(sum(P)))
     plt.figure(figsize=(10, 5))
     plt.imshow(P)
     plt.colorbar()
-    plt.savefig('./Plot/P.pdf')
+    plt.savefig('./Plot/P'+str(epsilon)+'.pdf')
+    plt.show()
 

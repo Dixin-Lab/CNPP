@@ -35,7 +35,7 @@ def prepare_dataloader(opt):
     return trainloader, testloader, num_types,params1,params2,pmat
 
 
-def train_epoch(model, training_data, optimizer, pred_loss_func, opt):
+def train_epoch(model, training_data, optimizer, pred_loss_func, opt,P_prior):
     """ Epoch operation in training phase. """
 
     model.train()
@@ -70,10 +70,25 @@ def train_epoch(model, training_data, optimizer, pred_loss_func, opt):
         # SE is usually large, scale it to stabilize training
         scale_time_loss = 100
 
-        loss = event_loss+pred_loss + se / scale_time_loss
+        #ot loss,trans matrix KL div
+        trans=model.encoder.event_emb.sinkhorn().T
+        trans=trans/torch.sum(trans)
+
+        KL_div= nn.KLDivLoss(reduction="sum")
+
+        ot_loss=KL_div(trans.log(),P_prior)
+
+        #print("trans sum",torch.sum(trans))
+        # print("ot_loss",ot_loss)
+        # print("event_loss", event_loss)
+        # print("se / scale_time_loss",se / scale_time_loss)
+        loss = event_loss+pred_loss + se / scale_time_loss +ot_loss
+
 
         loss.backward(retain_graph=True)
 
+        # print("coupling.grad",model.encoder.event_emb.coupling.grad)
+        # print("coupling.grad", model.encoder.event_emb.coupling)
         """ update parameters """
         optimizer.step()
 
@@ -125,18 +140,19 @@ def eval_epoch(model, validation_data, pred_loss_func, opt):
     return total_event_ll / total_num_event, total_event_rate / total_num_pred, rmse
 
 
-def train(model, training_data, validation_data, optimizer, scheduler, pred_loss_func, pmt,opt,gnd_pair):
+def train(model, training_data, validation_data, optimizer, scheduler, pred_loss_func, P_prior,opt,gnd_pair):
     """ Start training. """
 
     valid_event_losses = []  # validation log-likelihood
     valid_pred_losses = []  # validation event type prediction accuracy
     valid_rmse = []  # validation event time prediction RMSE
+
     for epoch_i in range(opt.epoch):
         epoch = epoch_i + 1
         print('[ Epoch', epoch, ']')
 
         start = time.time()
-        train_event, train_type, train_time = train_epoch(model, training_data, optimizer, pred_loss_func, opt)
+        train_event, train_type, train_time = train_epoch(model, training_data, optimizer, pred_loss_func, opt,P_prior)
         print('  - (Training)    loglikelihood: {ll: 8.5f}, '
               'accuracy: {type: 8.5f}, RMSE: {rmse: 8.5f}, '
               'elapse: {elapse:3.3f} min'
@@ -195,7 +211,7 @@ def main():
     parser.add_argument('-n_layers', type=int, default=4)
 
     parser.add_argument('-dropout', type=float, default=0.1)
-    parser.add_argument('-lr', type=float, default=1e-4)
+    parser.add_argument('-lr', type=float, default=1)
     parser.add_argument('-smooth', type=float, default=0.1)
 
     parser.add_argument('-log', type=str, default='log.txt')
@@ -250,9 +266,10 @@ def main():
     plt.imshow(pmat)
     plt.colorbar()
     plt.savefig('./Plot/pmat.pdf')
-
+    P=torch.from_numpy(np.load("P_prior1e-05.npz")["P"]).to(opt.device).float()
+    # P=P.
     gnd_pair=np.argwhere(pmat.numpy()).astype(np.int32)
-    train(model, trainloader, testloader, optimizer, scheduler, pred_loss_func,pmat.numpy(),opt,gnd_pair=gnd_pair)
+    train(model, trainloader, testloader, optimizer, scheduler, pred_loss_func,P,opt,gnd_pair=gnd_pair)
 
 
 

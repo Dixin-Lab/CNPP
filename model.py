@@ -343,11 +343,11 @@ class CoupledEmbedding(nn.Module):
         # #self.src_emb(X1)[1:]
         # tau=0.1
         # log_alpha = self.f(self.src_emb(X1)[1:]).T/tau
-        log_alpha=-self.coupling
+        log_alpha=-self.coupling/0.1
         for _ in range(self.n_iter):
             log_alpha = log_alpha - torch.logsumexp(log_alpha, -1, keepdim=True)
             log_alpha = log_alpha - torch.logsumexp(log_alpha, -2, keepdim=True)
-        return log_alpha.exp() * self.num_types[1]
+        return log_alpha.exp() #* self.num_types[1]
 
 
 
