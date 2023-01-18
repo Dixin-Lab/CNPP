@@ -4,7 +4,7 @@ import torch.utils.data
 from torch.distributions import categorical, exponential, uniform
 from typing import Dict, List, Tuple
 from constant import PAD
-
+import pickle
 
 # simulator
 def exp_kernel(dt: torch.Tensor, w: float = 1.0) -> torch.Tensor:
@@ -120,7 +120,27 @@ def generate_synthetic_tpps(dim: int = 10,
     seqs_len_train = seqs_len1[:-100] + seqs_len2[:-100]
     seqs_test = seqs1[-100:] + seqs2[-100:]
     seqs_len_test = seqs_len1[-100:] + seqs_len2[-100:]
-    return {'train': [seqs_train, seqs_len_train], 'test': [seqs_test, seqs_len_test]}, [params1, params2], pmat
+    return {'train':seqs_train, 'test':seqs_test}, [params1, params2], pmat
+
+    #return {'train': [seqs_train, seqs_len_train], 'test': [seqs_test, seqs_len_test]}, [params1, params2], pmat
+
+
+
+
+def save_pkl(data_dict,params1,params2,pmat, output_dir='.'):
+    data = {}
+    data['params1'] = params1
+    data['params2'] = params2
+    data['pmat'] = pmat
+    data['train'] = data_dict['train']
+    data['test'] = data_dict['test']
+    num1=pmat.shape[0]
+    num2=pmat.shape[1]
+
+
+    with open('{}/exp_{}_{}.pkl'.format(output_dir,num1,num2), 'wb') as f:
+        pickle.dump(data, f)
+    return
 
 
 class EventData(torch.utils.data.Dataset):
@@ -192,3 +212,8 @@ def get_dataloader(data, batch_size, shuffle=True):
         shuffle=shuffle
     )
     return dl
+
+if __name__=='__main__':
+    data_dict, [params1, params2], pmat=generate_synthetic_tpps(dim= 10,num_seq= 2000,max_time= 30,
+    thres= 0.5, w= 0.1)
+    save_pkl(data_dict, params1, params2, pmat, output_dir='.')

@@ -25,7 +25,7 @@ class ScaledDotProductAttention(nn.Module):
         attn = self.dropout(F.softmax(attn, dim=-1))
         output = torch.matmul(attn, v)
 
-        return output,
+        return output,attn
 
 
 class MultiHeadAttention(nn.Module):
@@ -153,7 +153,7 @@ def get_attn_key_pad_mask(seq_k, seq_q):
     padding_mask = seq_k.eq(PAD)
     padding_mask = padding_mask.unsqueeze(1).expand(-1, len_q, -1)  # b x lq x lk
     return padding_mask
-
+#mask的顺序感觉不够好
 
 def get_subsequent_mask(seq):
     """ For masking out the subsequent info, i.e., masked self-attention. """
@@ -184,7 +184,7 @@ class Encoder(nn.Module):
         # event type embedding
         # TODO
         self.event_emb = nn.Embedding(num_types + 1, d_model, padding_idx=PAD)
-
+        #希望取出来是0
         self.layer_stack = nn.ModuleList([
             EncoderLayer(d_model, d_inner, n_head, d_k, d_v, dropout=dropout, normalize_before=False)
             for _ in range(n_layers)])
@@ -202,8 +202,7 @@ class Encoder(nn.Module):
 
     def forward(self, event_type, event_time, non_pad_mask):
         """ Encode event sequences via masked self-attention. """
-
-        # prepare attention masks
+        #event_type bxl
         # slf_attn_mask is where we cannot look, i.e., the future and the padding
         slf_attn_mask_subseq = get_subsequent_mask(event_type)
         slf_attn_mask_keypad = get_attn_key_pad_mask(seq_k=event_type, seq_q=event_type)
@@ -333,13 +332,23 @@ class CoupledEmbedding(nn.Module):
         self.src_emb = nn.Linear(num_types[0] + 1, dim, bias=False)
         # How to initialize coupling might be important. I am not sure.
         self.coupling = nn.Parameter(data=torch.randn(num_types[1], num_types[0]))
-
+        self.f = nn.Sequential(
+            nn.Linear(dim,dim, bias=True),
+            nn.ReLU(),
+            nn.Linear(dim, num_types[1], bias=True),
+            nn.ReLU()
+        )
     def sinkhorn(self):
-        log_alpha = -self.coupling
+        X1=torch.eye(self.num_types[0] + 1).to('cuda')
+        #self.src_emb(X1)[1:]
+        tau=0.1
+        log_alpha = self.f(self.src_emb(X1)[1:]).T/tau
         for _ in range(self.n_iter):
             log_alpha = log_alpha - torch.logsumexp(log_alpha, -1, keepdim=True)
             log_alpha = log_alpha - torch.logsumexp(log_alpha, -2, keepdim=True)
-        return log_alpha.exp() * self.num_types[1]
+        return log_alpha.exp() #* self.num_types[1]
+
+
 
     def forward(self, event_types: torch.Tensor):
         """
@@ -349,11 +358,11 @@ class CoupledEmbedding(nn.Module):
         """
         event_types_onehot = F.one_hot(event_types, num_classes=self.total_num)  # [batch size, seq length, total_num]
         event_types_onehot = event_types_onehot.type(torch.FloatTensor)
-        event_types_onehot = event_types_onehot.to(event_types.device())
+        event_types_onehot = event_types_onehot.to(event_types.device)
         trans = self.sinkhorn()  # num1 x num0
-        event_types_aligned = event_types_onehot[:, :, :(self.num_types[0] + 1)]
-        event_types_aligned[:, :, 1:] = event_types_aligned[:, :, 1:] + \
-            torch.matmul(event_types_onehot[:, :, (self.num_types[0] + 1):], trans)
+        #print("trans",trans)
+        event_types_aligned = event_types_onehot[:, :, :(self.num_types[0] + 1)].clone()
+        event_types_aligned[:, :, 1:] =event_types_aligned[:, :, 1:] +  torch.matmul(event_types_onehot[:, :, (self.num_types[0] + 1):], trans)
         return self.src_emb(event_types_aligned)
 
 
@@ -462,10 +471,10 @@ class Transformer2(nn.Module):
         self.rnn = RNN_layers(d_model, d_rnn)
 
         # prediction of next time stamp
-        self.time_predictor = Predictor(d_model, 1)
+        self.time_predictor = Predictor2(d_model, 1)
 
         # prediction of next event type
-        self.type_predictor = Predictor(d_model, num_types)
+        self.type_predictor = Predictor2(d_model, sum(num_types))
 
     def forward(self, event_type, event_time):
         """
