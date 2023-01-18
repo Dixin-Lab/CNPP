@@ -1,1 +1,3 @@
 Epoch, Log-likelihood, Accuracy, RMSE
+1,  1.06515,  0.17763,  1.85961
+2,  1.10384,  0.17761,  1.86025
