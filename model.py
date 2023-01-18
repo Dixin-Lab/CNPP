@@ -363,7 +363,7 @@ class CoupledEmbedding(nn.Module):
         trans = self.sinkhorn()  # num1 x num0
         #print("trans",trans)
         event_types_aligned = event_types_onehot[:, :, :(self.num_types[0] + 1)].clone()
-        event_types_aligned[:, :, 1:] =event_types_aligned[:, :, 1:] +  torch.matmul(event_types_onehot[:, :, (self.num_types[0] + 1):], trans)
+        event_types_aligned[:, :, 1:] =event_types_aligned[:, :, 1:] +  torch.matmul(event_types_onehot[:, :, (self.num_types[0] + 1):], trans.detach())
         return self.src_emb(event_types_aligned)
 
 

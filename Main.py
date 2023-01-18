@@ -82,7 +82,7 @@ def train_epoch(model, training_data, optimizer, pred_loss_func, opt,P_prior):
         # print("ot_loss",ot_loss)
         # print("event_loss", event_loss)
         # print("se / scale_time_loss",se / scale_time_loss)
-        loss = event_loss+pred_loss + se / scale_time_loss +ot_loss
+        loss = event_loss+pred_loss + se / scale_time_loss +ot_loss*1000
 
 
         loss.backward(retain_graph=True)
@@ -211,7 +211,7 @@ def main():
     parser.add_argument('-n_layers', type=int, default=4)
 
     parser.add_argument('-dropout', type=float, default=0.1)
-    parser.add_argument('-lr', type=float, default=1)
+    parser.add_argument('-lr', type=float, default=0.0001)
     parser.add_argument('-smooth', type=float, default=0.1)
 
     parser.add_argument('-log', type=str, default='log.txt')
@@ -247,8 +247,10 @@ def main():
     model.to(opt.device)
 
     """ optimizer and scheduler """
-    optimizer = optim.Adam(filter(lambda x: x.requires_grad, model.parameters()),
-                           opt.lr, betas=(0.9, 0.999), eps=1e-05)
+    # optimizer = optim.Adam(filter(lambda x: x.requires_grad, model.parameters()),
+    #                        opt.lr, betas=(0.9, 0.999), eps=1e-05)
+    optimizer = optim.SGD(filter(lambda x: x.requires_grad, model.parameters()),
+                           opt.lr)
     scheduler = optim.lr_scheduler.StepLR(optimizer, 10, gamma=0.5)
 
     """ prediction loss function, either cross entropy or label smoothing """
@@ -283,5 +285,5 @@ def setup_seed(seed):
 
 
 if __name__ == '__main__':
-    setup_seed(888)
+    #setup_seed(888)
     main()
