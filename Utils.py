@@ -57,20 +57,21 @@ def compute_integral_unbiased(model, data, time, non_pad_mask, type_mask):
 
 def log_likelihood(model, data, time, types):
     """ Log-likelihood of sequence. """
-
+    #print("type",types)
     non_pad_mask = get_non_pad_mask(types).squeeze(2)
 
     #print("types.size()",types.size())
     #print(torch.tensor(*types.size(), model.num_types))
 
-    #sum(model.num_types)
+    num_types=sum(model.num_types)
 
-    type_mask = torch.zeros((*types.size(), 20)).to(data.device)
-    for i in range(20):
+    type_mask = torch.zeros((*types.size(), num_types)).to(data.device)
+    for i in range(num_types):
         type_mask[:, :, i] = (types == i + 1).bool().to(data.device)
 
     all_hid = model.linear(data)
     all_lambda = softplus(all_hid, model.beta)
+    #print("all_lambda",all_lambda.shape,"type_mask",type_mask.shape)
     type_lambda = torch.sum(all_lambda * type_mask, dim=2)
 
     # event log-likelihood
@@ -100,9 +101,9 @@ def type_loss(prediction, types, loss_func):
         loss = loss_func(prediction, truth)
     else:
         loss = loss_func(prediction.transpose(1, 2), truth)
-
-    loss = torch.sum(loss)
-    return loss, correct_num
+    print("type_loss loss",loss,"loss shape",loss.shape,"sum loss",torch.sum(loss))
+    loss_r = torch.sum(loss)
+    return loss_r, correct_num
 
 
 def time_loss(prediction, event_time):

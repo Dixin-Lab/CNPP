@@ -59,6 +59,7 @@ def train_epoch(model, training_data, optimizer, pred_loss_func, opt,P_prior):
         """ backward """
         # negative log-likelihood
         event_ll, non_event_ll = Utils.log_likelihood(model, enc_out, event_time, event_type)
+        print("event_ll, non_event_ll",event_ll, non_event_ll)
         event_loss = -torch.sum(event_ll - non_event_ll)
 
         # type prediction
@@ -82,7 +83,7 @@ def train_epoch(model, training_data, optimizer, pred_loss_func, opt,P_prior):
         # print("ot_loss",ot_loss)
         # print("event_loss", event_loss)
         # print("se / scale_time_loss",se / scale_time_loss)
-        loss = event_loss+pred_loss + se / scale_time_loss +ot_loss*1000
+        loss = event_loss+pred_loss + se / scale_time_loss #+ot_loss*1000
 
 
         loss.backward(retain_graph=True)
@@ -94,6 +95,7 @@ def train_epoch(model, training_data, optimizer, pred_loss_func, opt,P_prior):
 
         """ note keeping """
         total_event_ll += -event_loss.item()
+        print("-event_loss.item()",-event_loss.item())
         total_time_se += se.item()
         total_event_rate += pred_num_event.item()
         total_num_event += event_type.ne(constant.PAD).sum().item()
@@ -196,10 +198,10 @@ def main():
 
     parser = argparse.ArgumentParser()
 
-    parser.add_argument('-data', default="exp_10_10_2000.pkl")
+    parser.add_argument('-data', default="exp_100_100.pkl")
 
     parser.add_argument('-epoch', type=int, default=30)
-    parser.add_argument('-batch_size', type=int, default=16)
+    parser.add_argument('-batch_size', type=int, default=12)
 
     parser.add_argument('-d_model', type=int, default=64)
     parser.add_argument('-d_rnn', type=int, default=256)
@@ -251,7 +253,7 @@ def main():
     #                        opt.lr, betas=(0.9, 0.999), eps=1e-05)
     optimizer = optim.SGD(filter(lambda x: x.requires_grad, model.parameters()),
                            opt.lr)
-    scheduler = optim.lr_scheduler.StepLR(optimizer, 10, gamma=0.5)
+    scheduler = optim.lr_scheduler.StepLR(optimizer, 1000, gamma=0.5)
 
     """ prediction loss function, either cross entropy or label smoothing """
     if opt.smooth > 0:
@@ -268,7 +270,7 @@ def main():
     plt.imshow(pmat)
     plt.colorbar()
     plt.savefig('./Plot/pmat.pdf')
-    P=torch.from_numpy(np.load("P_prior1e-05.npz")["P"]).to(opt.device).float()
+    P=torch.from_numpy(np.load("P_100_prior0.0001.npz")["P"]).to(opt.device).float()
     # P=P.
     gnd_pair=np.argwhere(pmat.numpy()).astype(np.int32)
     train(model, trainloader, testloader, optimizer, scheduler, pred_loss_func,P,opt,gnd_pair=gnd_pair)

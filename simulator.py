@@ -77,6 +77,7 @@ def simulate_ogata_thinning(mu: torch.Tensor,
             exp_dist = exponential.Exponential(rate=lambda_ts_all)
 
         if sequence['ci'] is not None:
+            print(len(sequence['ci']))
             seqs_len.append(len(sequence['ci']))
             seqs.append(sequence)
 
@@ -143,6 +144,71 @@ def save_pkl(data_dict,params1,params2,pmat, output_dir='.'):
     return
 
 
+
+#tick
+
+def make_seq_from_tick(infect, w, n_nodes, mu, max_time = 30, num_seq =2000):
+
+    from tick.hawkes import SimuHawkesSumExpKernels, SimuHawkesMulti
+
+    infect= infect[:, :, np.newaxis]
+    hawkes_exp_kernels = SimuHawkesSumExpKernels(
+        adjacency=infect, decays=w, baseline=mu,
+        end_time=max_time, verbose=False)
+
+    multi = SimuHawkesMulti(hawkes_exp_kernels, n_simulations=num_seq)
+
+    multi.end_time = [max_time for i in range(num_seq)]
+    multi.simulate()
+
+
+    seqs = []
+    seqs_len = []
+    timestamps = multi.timestamps
+    for i in range(num_seq):
+
+        sequence = {'ti': None,  # event_times
+                    'ci': None,  # evnet_type
+                    }
+        ti_array = np.empty(0)
+        ci_array = np.empty(0)
+        for j in range(n_nodes):
+            array = timestamps[i][j]
+            l = len(array)
+            ti_array = np.hstack((ti_array, array))
+            ci_array = np.hstack((ci_array,np.full(l,j)))
+            sorted_idx = np.argsort(ti_array)
+            ti_array = ti_array[sorted_idx]
+            ci_array = ci_array[sorted_idx]
+
+        sequence['ti'] = ti_array
+        sequence['ci'] = ci_array.astype(int)
+        seqs.append(sequence)
+        seqs_len.append(len(ci_array))
+        print(i, len(ci_array))
+
+    return seqs,seqs_len
+
+def generate_synthetic_tpps_from_tick(dim: int = 10,
+                            num_seq: int = 200,
+                            max_time: float = 30,
+                            thres: float = 0.5,
+                            w: float = 0.1) -> Tuple[Dict, List, torch.Tensor]:
+    params1, params2, pmat = synthetic_hawkes_parameters(dim=dim, thres=thres)
+    seqs1, seqs_len1 = make_seq_from_tick(infect=params1["A"].numpy(),
+        w=[w], n_nodes=len(params1["mu"]),mu=params1["mu"].numpy(), max_time = max_time, num_seq =num_seq)
+    seqs2, seqs_len2 = make_seq_from_tick(infect=params2["A"].numpy(),
+        w=[w], n_nodes=len(params2["mu"]), mu=params2["mu"].numpy(), max_time = max_time, num_seq =num_seq)
+    for n in range(len(seqs2)):
+        seqs2[n]['ci'] = seqs2[n]['ci'] + dim
+    seqs_train = seqs1[:-100] + seqs2[:-100]
+    seqs_len_train = seqs_len1[:-100] + seqs_len2[:-100]
+    seqs_test = seqs1[-100:] + seqs2[-100:]
+    seqs_len_test = seqs_len1[-100:] + seqs_len2[-100:]
+    return {'train':seqs_train, 'test':seqs_test}, [params1, params2], pmat
+
+
+#define how to get event data
 class EventData(torch.utils.data.Dataset):
     """ Event stream dataset. """
 
@@ -213,7 +279,8 @@ def get_dataloader(data, batch_size, shuffle=True):
     )
     return dl
 
-if __name__=='__main__':
-    data_dict, [params1, params2], pmat=generate_synthetic_tpps(dim= 10,num_seq= 2000,max_time= 30,
+
+if __name__=='__main__':#30 45 45
+    data_dict, [params1, params2], pmat=generate_synthetic_tpps(dim= 100,num_seq= 2000,max_time= 10,
     thres= 0.5, w= 0.1)
     save_pkl(data_dict, params1, params2, pmat, output_dir='.')
