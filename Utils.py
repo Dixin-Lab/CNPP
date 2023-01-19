@@ -21,6 +21,8 @@ def compute_event(event, non_pad_mask):
     event.masked_fill_(~non_pad_mask.bool(), 1.0)
 
     result = torch.log(event)
+    print("event",event)
+    print("result",result)
     return result
 
 
@@ -57,11 +59,8 @@ def compute_integral_unbiased(model, data, time, non_pad_mask, type_mask):
 
 def log_likelihood(model, data, time, types):
     """ Log-likelihood of sequence. """
-    #print("type",types)
-    non_pad_mask = get_non_pad_mask(types).squeeze(2)
 
-    #print("types.size()",types.size())
-    #print(torch.tensor(*types.size(), model.num_types))
+    non_pad_mask = get_non_pad_mask(types).squeeze(2)
 
     num_types=sum(model.num_types)
 
@@ -70,11 +69,12 @@ def log_likelihood(model, data, time, types):
         type_mask[:, :, i] = (types == i + 1).bool().to(data.device)
 
     all_hid = model.linear(data)
-    all_lambda = softplus(all_hid, model.beta)
-    #print("all_lambda",all_lambda.shape,"type_mask",type_mask.shape)
+    all_lambda = softplus(all_hid, torch.abs(model.beta))
+
     type_lambda = torch.sum(all_lambda * type_mask, dim=2)
 
     # event log-likelihood
+
     event_ll = compute_event(type_lambda, non_pad_mask)
     event_ll = torch.sum(event_ll, dim=-1)
 
@@ -101,7 +101,7 @@ def type_loss(prediction, types, loss_func):
         loss = loss_func(prediction, truth)
     else:
         loss = loss_func(prediction.transpose(1, 2), truth)
-    print("type_loss loss",loss,"loss shape",loss.shape,"sum loss",torch.sum(loss))
+    # print("type_loss loss",loss,"loss shape",loss.shape,"sum loss",torch.sum(loss))
     loss_r = torch.sum(loss)
     return loss_r, correct_num
 
@@ -132,7 +132,7 @@ class LabelSmoothingLoss(nn.Module):
         super(LabelSmoothingLoss, self).__init__()
 
         self.eps = label_smoothing
-        self.num_classes = sum(tgt_vocab_size)
+        self.num_classes = tgt_vocab_size
         self.ignore_index = ignore_index
 
     def forward(self, output, target):

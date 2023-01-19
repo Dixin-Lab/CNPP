@@ -472,10 +472,23 @@ class Transformer2(nn.Module):
         self.rnn = RNN_layers(d_model, d_rnn)
 
         # prediction of next time stamp
-        self.time_predictor = Predictor2(d_model, 1)
+        self.time_predictor_list = nn.ModuleList([Predictor2(d_model,1),
+                        Predictor2(d_model,1)])
 
         # prediction of next event type
-        self.type_predictor = Predictor2(d_model, sum(num_types))
+        self.type_predictor_list = nn.ModuleList([Predictor2(d_model, num_types[0])
+                                                     ,Predictor2(d_model,num_types[1])])
+    def predict_event_and_time(self,process_idx, event_type, event_time):
+        non_pad_mask = get_non_pad_mask(event_type)
+
+        enc_output = self.encoder(event_type, event_time, non_pad_mask)
+        enc_output = self.rnn(enc_output, non_pad_mask)
+
+        time_prediction = self.time_predictor_list[process_idx](enc_output, non_pad_mask)
+
+        type_prediction = self.type_predictor_list[process_idx](enc_output, non_pad_mask)
+
+        return (type_prediction, time_prediction)
 
     def forward(self, event_type, event_time):
         """
@@ -493,8 +506,8 @@ class Transformer2(nn.Module):
         enc_output = self.encoder(event_type, event_time, non_pad_mask)
         enc_output = self.rnn(enc_output, non_pad_mask)
 
-        time_prediction = self.time_predictor(enc_output, non_pad_mask)
+        # time_prediction = self.time_predictor(enc_output, non_pad_mask)
+        #
+        # type_prediction = self.type_predictor(enc_output, non_pad_mask)
 
-        type_prediction = self.type_predictor(enc_output, non_pad_mask)
-
-        return enc_output, (type_prediction, time_prediction)
+        return enc_output#, (type_prediction, time_prediction)
