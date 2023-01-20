@@ -228,6 +228,7 @@ def eval_epoch_event_and_time(process_idx,model, validation_data, pred_loss_func
     rmse = np.sqrt(total_time_se / total_num_pred)
     return total_event_rate / total_num_pred, rmse
 
+
 def train_backbone(model, training_data, validation_data, optimizer, scheduler, P_prior, opt, gnd_pair):
     """ Start training. """
 
@@ -357,7 +358,7 @@ def main():
     trainloader_0,trainloader_1,\
     testloader_0,testloader_1,\
     num_types,params1,params2,pmat= prepare_dataloader(opt)
-
+    
     """ prepare model """
     model = Transformer2(
         num_types=num_types,
@@ -410,7 +411,7 @@ def main():
     #then train event acc and time r
     #model.load_state_dict(torch.load("./save.pt"))
 
-    train_event_and_time(0,model,trainloader_0, testloader_0, optimizer, scheduler, pred_loss_func0,opt)
+    train_event_and_time(0, model, trainloader_0, testloader_0, optimizer, scheduler, pred_loss_func0,opt)
     train_event_and_time(1, model, trainloader_1, testloader_1, optimizer, scheduler, pred_loss_func1, opt)
 
 

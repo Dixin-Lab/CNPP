@@ -182,9 +182,7 @@ class Encoder(nn.Module):
             device=torch.device('cuda'))
 
         # event type embedding
-        # TODO
-        self.event_emb = nn.Embedding(num_types + 1, d_model, padding_idx=PAD)
-        #希望取出来是0
+        self.event_emb = nn.Embedding(sum(num_types) + 1, d_model, padding_idx=PAD)
         self.layer_stack = nn.ModuleList([
             EncoderLayer(d_model, d_inner, n_head, d_k, d_v, dropout=dropout, normalize_before=False)
             for _ in range(n_layers)])
@@ -202,7 +200,7 @@ class Encoder(nn.Module):
 
     def forward(self, event_type, event_time, non_pad_mask):
         """ Encode event sequences via masked self-attention. """
-        #event_type bxl
+        # event_type bxl
         # slf_attn_mask is where we cannot look, i.e., the future and the padding
         slf_attn_mask_subseq = get_subsequent_mask(event_type)
         slf_attn_mask_keypad = get_attn_key_pad_mask(seq_k=event_type, seq_q=event_type)
@@ -263,7 +261,7 @@ class Transformer(nn.Module):
 
     def __init__(
             self,
-            num_types, d_model=256, d_rnn=128, d_inner=1024,
+            num_types: List, d_model=256, d_rnn=128, d_inner=1024,
             n_layers=4, n_head=4, d_k=64, d_v=64, dropout=0.1):
         super().__init__()
 
@@ -338,18 +336,17 @@ class CoupledEmbedding(nn.Module):
             nn.Linear(dim, num_types[1], bias=True),
             nn.ReLU()
         )
+
     def sinkhorn(self):
         # X1=torch.eye(self.num_types[0] + 1).to('cuda')
         # #self.src_emb(X1)[1:]
         # tau=0.1
         # log_alpha = self.f(self.src_emb(X1)[1:]).T/tau
-        log_alpha=-self.coupling/0.1
+        log_alpha = -self.coupling / 0.1
         for _ in range(self.n_iter):
             log_alpha = log_alpha - torch.logsumexp(log_alpha, -1, keepdim=True)
             log_alpha = log_alpha - torch.logsumexp(log_alpha, -2, keepdim=True)
         return log_alpha.exp() #* self.num_types[1]
-
-
 
     def forward(self, event_types: torch.Tensor):
         """
@@ -363,7 +360,7 @@ class CoupledEmbedding(nn.Module):
         trans = self.sinkhorn()  # num1 x num0
         #print("trans",trans)
         event_types_aligned = event_types_onehot[:, :, :(self.num_types[0] + 1)].clone()
-        event_types_aligned[:, :, 1:] =event_types_aligned[:, :, 1:] +  torch.matmul(event_types_onehot[:, :, (self.num_types[0] + 1):], trans.detach())
+        event_types_aligned[:, :, 1:] = event_types_aligned[:, :, 1:] +  torch.matmul(event_types_onehot[:, :, (self.num_types[0] + 1):], trans.detach())
         return self.src_emb(event_types_aligned)
 
 
@@ -478,6 +475,7 @@ class Transformer2(nn.Module):
         # prediction of next event type
         self.type_predictor_list = nn.ModuleList([Predictor2(d_model, num_types[0])
                                                      ,Predictor2(d_model,num_types[1])])
+
     def predict_event_and_time(self,process_idx, event_type, event_time):
         non_pad_mask = get_non_pad_mask(event_type)
 
