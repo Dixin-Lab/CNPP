@@ -8,8 +8,39 @@ import torch.optim as optim
 
 import constant
 import utils
+from model import Transformer
 
 from tqdm import tqdm
+
+from simulator import get_dataloader
+
+
+
+def prepare_dataloader(opt):
+    """ Load data and prepare dataloader. """
+
+    def load_data(name):
+        with open(name, 'rb') as f:
+            data = pickle.load(f)
+            num_types = [data['pmat'].shape[0],data['pmat'].shape[1]]
+
+            return data, num_types
+
+    # print('[Info] Loading train data...')
+    data, num_types = load_data(opt.data)
+    params1 = data['params1']
+    params2 = data['params2']
+    pmat = data['pmat']
+    lt=len(data['train'])
+    le=len(data['test'])
+    trainloader = get_dataloader(data=data['train'],batch_size=opt.batch_size)
+    testloader = get_dataloader(data=data['test'], batch_size=opt.batch_size)
+    trainloader_0 = get_dataloader(data=data['train'][:lt//2],batch_size=opt.batch_size)
+    trainloader_1 = get_dataloader(data=data['train'][lt//2:],batch_size=opt.batch_size)
+    testloader_0 = get_dataloader(data=data['test'][:le//2],batch_size=opt.batch_size)
+    testloader_1 = get_dataloader(data=data['test'][le//2:],batch_size=opt.batch_size)
+    return trainloader, testloader,trainloader_0,trainloader_1,testloader_0,testloader_1, num_types,params1,params2,pmat
+
 
 
 def train_epoch(model, training_data_list, optimizer, pred_loss_func, opt):
@@ -25,47 +56,56 @@ def train_epoch(model, training_data_list, optimizer, pred_loss_func, opt):
     
     # training_data_list: [dataloader0, dataloader1]
     # if process_idx == 1:     event_type -= model.num_types[0] !!!
-    training_data_list = [iter(dataloader) for dataloader in training_data_list]
 
-    for process_idx, dataloader in enumerate(training_data_list):
-    # for batch in tqdm(training_data, mininterval=2,
-    #                   desc='  - (Training)   ', leave=False):
-        batch = next(dataloader)
+    training_data_iters = [iter(dataloader) for dataloader in training_data_list]
 
-        """ prepare data """
-        event_time, time_gap, event_type = map(lambda x: x.to(opt.device), batch)
+    training_data_batch_nums=min([len(dataloader) for dataloader in training_data_list])
 
-        """ forward """
-        optimizer.zero_grad()
+    print(training_data_batch_nums)
 
-        enc_out, prediction = model(process_idx, event_type, event_time)
+    #for batch_num in range(training_data_batch_nums):
+    for batch_num in tqdm(range(training_data_batch_nums), mininterval=2, desc='  - (Training)   ', leave=False):
 
-        """ backward """
-        # negative log-likelihood
-        event_ll, non_event_ll = utils.log_likelihood(model, process_idx, enc_out, event_time, event_type)
-        event_loss = -torch.sum(event_ll - non_event_ll)
+        for process_idx in range(2):
 
-        # type prediction
-        pred_loss, pred_num_event = utils.type_loss(prediction[0], event_type, pred_loss_func)
+            batch=next(training_data_iters[process_idx])
+            """ prepare data """
+            event_time, time_gap, event_type = map(lambda x: x.to(opt.device), batch)
 
-        # time prediction
-        se = utils.time_loss(prediction[1], event_time)
+            """ process_idx == 1 """
+            if process_idx == 1:
+                event_type[event_type>0]-=model.num_types[0]
+            """ forward """
+            optimizer.zero_grad()
 
-        # SE is usually large, scale it to stabilize training
-        scale_time_loss = 100
-        loss = event_loss + pred_loss + se / scale_time_loss
-        loss.backward()
+            enc_out, prediction = model(process_idx, event_type, event_time)
 
-        """ update parameters """
-        optimizer.step()
+            """ backward """
+            # negative log-likelihood
+            event_ll, non_event_ll = utils.log_likelihood(model, process_idx, enc_out, event_time, event_type)
+            event_loss = -torch.sum(event_ll - non_event_ll)
 
-        """ note keeping """
-        total_event_ll += -event_loss.item()
-        total_time_se += se.item()
-        total_event_rate += pred_num_event.item()
-        total_num_event += event_type.ne(constant.PAD).sum().item()
-        # we do not predict the first event
-        total_num_pred += event_type.ne(constant.PAD).sum().item() - event_time.shape[0]
+            # type prediction
+            pred_loss, pred_num_event = utils.type_loss(prediction[0], event_type, pred_loss_func[process_idx])
+
+            # time prediction
+            se = utils.time_loss(prediction[1], event_time)
+
+            # SE is usually large, scale it to stabilize training
+            scale_time_loss = 100
+            loss = event_loss + pred_loss + se / scale_time_loss
+            loss.backward()
+
+            """ update parameters """
+            optimizer.step()
+
+            """ note keeping """
+            total_event_ll += -event_loss.item()
+            total_time_se += se.item()
+            total_event_rate += pred_num_event.item()
+            total_num_event += event_type.ne(constant.PAD).sum().item()
+            # we do not predict the first event
+            total_num_pred += event_type.ne(constant.PAD).sum().item() - event_time.shape[0]
 
     rmse = np.sqrt(total_time_se / total_num_pred)
     return total_event_ll / total_num_event, total_event_rate / total_num_pred, rmse
@@ -85,37 +125,48 @@ def eval_epoch(model, validation_data_list, pred_loss_func, opt):
 
         # training_data_list: [dataloader0, dataloader1]
         # if process_idx == 1:     event_type -= model.num_types[0] !!!
-        validation_data_list = [iter(dataloader) for dataloader in validation_data_list]
 
-        for process_idx, dataloader in enumerate(validation_data_list):
-        # for batch in tqdm(validation_data, mininterval=2,
-        #                   desc='  - (Validation) ', leave=False):
-            batch = next(dataloader)
 
-            """ prepare data """
-            event_time, time_gap, event_type = map(lambda x: x.to(opt.device), batch)
+        validation_data_iters = [iter(dataloader) for dataloader in validation_data_list]
 
-            """ forward """
-            enc_out, prediction = model(event_type, event_time)
+        validation_data_batch_nums = min([len(dataloader) for dataloader in validation_data_list])
 
-            """ compute loss """
-            event_ll, non_event_ll = utils.log_likelihood(model, enc_out, event_time, event_type)
-            event_loss = -torch.sum(event_ll - non_event_ll)
-            _, pred_num = utils.type_loss(prediction[0], event_type, pred_loss_func)
-            se = utils.time_loss(prediction[1], event_time)
+        print(validation_data_batch_nums)
 
-            """ note keeping """
-            total_event_ll += -event_loss.item()
-            total_time_se += se.item()
-            total_event_rate += pred_num.item()
-            total_num_event += event_type.ne(constant.PAD).sum().item()
-            total_num_pred += event_type.ne(constant.PAD).sum().item() - event_time.shape[0]
+        # for batch_num in range(training_data_batch_nums):
+        for batch_num in tqdm(range(validation_data_batch_nums), mininterval=2, desc='  - (Training)   ', leave=False):
+
+            for process_idx in range(2):
+
+                batch = next(validation_data_iters[process_idx])
+                """ prepare data """
+                event_time, time_gap, event_type = map(lambda x: x.to(opt.device), batch)
+
+                """ process_idx == 1 """
+                if process_idx == 1:
+                    event_type[event_type > 0] -= model.num_types[0]
+
+                """ forward """
+                enc_out, prediction = model(process_idx, event_type, event_time)
+
+                """ compute loss """
+                event_ll, non_event_ll = utils.log_likelihood(model,  process_idx, enc_out, event_time, event_type)
+                event_loss = -torch.sum(event_ll - non_event_ll)
+                _, pred_num = utils.type_loss(prediction[0], event_type, pred_loss_func[process_idx])
+                se = utils.time_loss(prediction[1], event_time)
+
+                """ note keeping """
+                total_event_ll += -event_loss.item()
+                total_time_se += se.item()
+                total_event_rate += pred_num.item()
+                total_num_event += event_type.ne(constant.PAD).sum().item()
+                total_num_pred += event_type.ne(constant.PAD).sum().item() - event_time.shape[0]
 
     rmse = np.sqrt(total_time_se / total_num_pred)
     return total_event_ll / total_num_event, total_event_rate / total_num_pred, rmse
 
 
-def train(model, training_data_list, validation_data_list, optimizer, scheduler, pred_loss_func, opt):
+def train(model, training_data_list, validation_data_list, optimizer, scheduler, pred_loss_func:list, opt):
     """ Start training. """
 
     valid_event_losses = []  # validation log-likelihood
@@ -152,3 +203,105 @@ def train(model, training_data_list, validation_data_list, optimizer, scheduler,
                     .format(epoch=epoch, ll=valid_event, acc=valid_type, rmse=valid_time))
 
         scheduler.step()
+
+
+def main():
+
+    """ Main function. """
+
+    parser = argparse.ArgumentParser()
+
+    parser.add_argument('-data', default="./exp_10_10_2000.pkl")
+
+    parser.add_argument('-epoch', type=int, default=30)
+    parser.add_argument('-batch_size', type=int, default=16)
+
+    parser.add_argument('-d_model', type=int, default=64)
+    parser.add_argument('-d_rnn', type=int, default=256)
+    parser.add_argument('-d_inner_hid', type=int, default=128)
+    parser.add_argument('-d_k', type=int, default=16)
+    parser.add_argument('-d_v', type=int, default=16)
+
+    parser.add_argument('-n_head', type=int, default=4)
+    parser.add_argument('-n_layers', type=int, default=4)
+
+    parser.add_argument('-dropout', type=float, default=0.1)
+    parser.add_argument('-lr', type=float, default=0.0001)
+    parser.add_argument('-smooth', type=float, default=0.1)
+
+    parser.add_argument('-log', type=str, default='log.txt')
+
+    opt = parser.parse_args()
+
+    # default device is CUDA
+    opt.device = torch.device('cuda')
+    # torch.device('cuda')
+
+    # setup the log file
+    with open(opt.log, 'w') as f:
+        f.write('Epoch, Log-likelihood, Accuracy, RMSE\n')
+
+    print('[Info] parameters: {}'.format(opt))
+
+    """ prepare dataloader """
+    trainloader, testloader, \
+    trainloader_0, trainloader_1, \
+    testloader_0, testloader_1, \
+    num_types, params1, params2, pmat = prepare_dataloader(opt)
+
+    training_data_list = [trainloader_0, trainloader_1]
+    validation_data_list = [testloader_0, testloader_1]
+
+    """ prepare model """
+    model = Transformer(
+        num_types=num_types,
+        d_model=opt.d_model,
+        d_rnn=opt.d_rnn,
+        d_inner=opt.d_inner_hid,
+        n_layers=opt.n_layers,
+        n_head=opt.n_head,
+        d_k=opt.d_k,
+        d_v=opt.d_v,
+        dropout=opt.dropout,
+    )
+    model.to(opt.device)
+
+    """ optimizer and scheduler """
+    # optimizer = optim.Adam(filter(lambda x: x.requires_grad, model.parameters()),
+    #                        opt.lr, betas=(0.9, 0.999), eps=1e-05)
+    optimizer = optim.SGD(filter(lambda x: x.requires_grad, model.parameters()),
+                           opt.lr)
+    scheduler = optim.lr_scheduler.StepLR(optimizer, 1000, gamma=0.5)
+
+    """ prediction loss function, either cross entropy or label smoothing """
+    # TO DO
+    if opt.smooth > 0:
+        pred_loss_func0 = utils.LabelSmoothingLoss(opt.smooth, num_types[0], ignore_index=-1)
+        pred_loss_func1 = utils.LabelSmoothingLoss(opt.smooth, num_types[1], ignore_index=-1)
+        pred_loss_func = [pred_loss_func0, pred_loss_func1]
+    else:
+        pred_loss_func0 = nn.CrossEntropyLoss(ignore_index=-1, reduction='none')
+        pred_loss_func1 = nn.CrossEntropyLoss(ignore_index=-1, reduction='none')
+        pred_loss_func = [pred_loss_func0, pred_loss_func1]
+
+    train(model, training_data_list, validation_data_list, optimizer, scheduler, pred_loss_func, opt)
+
+
+
+
+
+
+import random
+
+def setup_seed(seed):
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+    np.random.seed(seed)
+    random.seed(seed)
+    torch.backends.cudnn.deterministic = True
+
+
+if __name__ == '__main__':
+    # setup_seed(888)
+    main()
+

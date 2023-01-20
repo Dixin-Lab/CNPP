@@ -35,7 +35,7 @@ def compute_integral_biased(all_lambda, time, non_pad_mask):
     return result
 
 
-def compute_integral_unbiased(model, data, time, non_pad_mask, type_mask):
+def compute_integral_unbiased(model, process_idx, data, time, non_pad_mask, type_mask):
     """ Log-likelihood of non-events, using Monte Carlo integration. """
 
     num_samples = 100
@@ -45,10 +45,10 @@ def compute_integral_unbiased(model, data, time, non_pad_mask, type_mask):
                 torch.rand([*diff_time.size(), num_samples], device=data.device)
     temp_time /= (time[:, :-1] + 1).unsqueeze(2)
 
-    temp_hid = model.linear(data)[:, 1:, :]
+    temp_hid = model.linear_list[process_idx](data)[:, 1:, :]
     temp_hid = torch.sum(temp_hid * type_mask[:, 1:, :], dim=2, keepdim=True)
 
-    all_lambda = softplus(temp_hid + model.alpha * temp_time, model.beta)
+    all_lambda = softplus(temp_hid + model.alpha * temp_time, torch.abs(model.beta))
     all_lambda = torch.sum(all_lambda, dim=2) / num_samples
 
     unbiased_integral = all_lambda * diff_time
@@ -78,7 +78,7 @@ def log_likelihood(model, process_idx, data, time, types):
 
     # non-event log-likelihood, either numerical integration or MC integration
     # non_event_ll = compute_integral_biased(type_lambda, time, non_pad_mask)
-    non_event_ll = compute_integral_unbiased(model, data, time, non_pad_mask, type_mask)
+    non_event_ll = compute_integral_unbiased(model, process_idx, data, time, non_pad_mask, type_mask)
     non_event_ll = torch.sum(non_event_ll, dim=-1)
 
     return event_ll, non_event_ll

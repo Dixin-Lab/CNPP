@@ -133,7 +133,7 @@ class Transformer(nn.Module):
 
     def __init__(
             self,
-            num_types: List, d_model=256, d_rnn=128, d_inner=1024,
+            num_types: list, d_model=256, d_rnn=128, d_inner=1024,
             n_layers=4, n_head=4, d_k=64, d_v=64, dropout=0.1):
         super().__init__()
 
@@ -151,7 +151,7 @@ class Transformer(nn.Module):
         self.num_types = num_types
 
         # convert hidden vectors into a scalar 
-        self.linear_list = nn.ModuleList([nn.Linear(d_model, event_type)] for event_type in num_types)
+        self.linear_list = nn.ModuleList([nn.Linear(d_model, event_type) for event_type in num_types])
 
         # parameter for the weight of time difference
         self.alpha = nn.Parameter(torch.tensor(-0.1))
@@ -166,7 +166,7 @@ class Transformer(nn.Module):
         self.time_predictor = Predictor(d_model, 1)
 
         # prediction of next event type
-        self.type_predictor_list = nn.ModuleList([Predictor(d_model, event_type)] for event_type in num_types)
+        self.type_predictor_list = nn.ModuleList([Predictor(d_model, event_type) for event_type in num_types])
 
     def forward(self, process_idx, event_type, event_time):
         """
