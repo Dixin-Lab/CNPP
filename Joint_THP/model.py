@@ -59,7 +59,8 @@ class CoupledEmbedding(nn.Module):
         # #self.src_emb(X1)[1:]
         # tau=0.1
         # log_alpha = self.f(self.src_emb(X1)[1:]).T/tau
-        log_alpha = -self.coupling / 0.1
+        # log_alpha = -self.coupling / 0.1
+        log_alpha = self.P.T / 0.0001
         for _ in range(self.n_iter):
             log_alpha = log_alpha - torch.logsumexp(log_alpha, -1, keepdim=True)
             log_alpha = log_alpha - torch.logsumexp(log_alpha, -2, keepdim=True)
@@ -74,9 +75,16 @@ class CoupledEmbedding(nn.Module):
         event_types_onehot = F.one_hot(event_types, num_classes=self.num_types[process_idx]+1)  # [batch size, seq length, total_num]
         event_types_onehot = event_types_onehot.type(torch.FloatTensor)
         event_types_onehot = event_types_onehot.to(event_types.device)
-        #trans = self.sinkhorn()  # num1 x num0
-        trans = (self.P).T*self.num_types[1]
+        trans = self.sinkhorn()  # num1 x num0
+        #trans = (self.P).T*self.num_types[1]
         #print("trans",trans)
+        #print(torch.sum(trans))
+        # import matplotlib.pyplot as plt
+        # plt.figure(figsize=(10, 5))
+        # plt.imshow(trans.cpu().detach().T.numpy())
+        # plt.colorbar()
+        # plt.show()
+        # plt.close()
         if process_idx == 0:
             event_types_aligned = event_types_onehot[:, :, :(self.num_types[0] + 1)].clone()
         elif process_idx == 1:

@@ -149,9 +149,9 @@ if __name__=="__main__":
 
 
     num_seq=2000
-    max_time=45
-    #get_prior_P('./Joint_THP/exp_50_50_2000_45.pkl','a_b_const_50_2000_45.npz',epsilon=0.0001,precision=1e-11,max_time=max_time,num_seq=num_seq)
-    prior_accuracy('./Joint_THP/exp_50_50_2000_45.pkl','P_50_prior_0.0001_1e-11_2000_45.npz')
+    max_time=5
+    get_prior_P('./Joint_THP/exp_50_50_2000_45.pkl','a_b_const_50_2000_45.npz',epsilon=0.0001,precision=1e-11,max_time=max_time,num_seq=num_seq)
+    #prior_accuracy('./Joint_THP/exp_50_50_2000_45.pkl','P_50_prior_0.0001_1e-11_2000_45.npz')
 
 
 

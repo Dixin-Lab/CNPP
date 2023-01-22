@@ -281,11 +281,12 @@ def eval_epoch(model, validation_data_list, pred_loss_func, opt):
     from sklearn.metrics import f1_score
     f1_0=f1_score(true_0, pred_0, average='micro')
     f1_1=f1_score(true_1, pred_1, average='micro')
-    true_1_ = list(map(lambda x: x +model.num_types[0], true_1))
-    pred_1_ = list(map(lambda x: x + model.num_types[0], pred_1))
-    true_1_.extend(true_0)
-    pred_1_.extend(pred_0)
-    f1_total=f1_score(true_1_,pred_1_, average='micro')
+    f1_total=(f1_0+f1_1)/2
+    # true_1_ = list(map(lambda x: x +model.num_types[0], true_1))
+    # pred_1_ = list(map(lambda x: x + model.num_types[0], pred_1))
+    # true_1_.extend(true_0)
+    # pred_1_.extend(pred_0)
+    # f1_total=f1_score(true_1_,pred_1_, average='micro')
     print("test epoch process 0, f1 score",f1_0)
     print("test epoch process 1, f1 score", f1_1)
     print("test epoch total, f1 score", f1_total)
@@ -337,7 +338,7 @@ def main():
 
     parser = argparse.ArgumentParser()
 
-    parser.add_argument('-data', default="./exp_10_10_2000_30.pkl")
+    parser.add_argument('-data', default="../exp_100_100_2000_5.pkl")
 
     parser.add_argument('-epoch', type=int, default=50)
     parser.add_argument('-lr', type=float, default=0.001)
@@ -380,7 +381,7 @@ def main():
     validation_data_list = [testloader_0, testloader_1]
 
     """ read P_prior """
-    P_prior = torch.from_numpy(np.load("P_10_prior_0.0001_1e-11_2000_30.npz")["P"]).to(opt.device).float()
+    P_prior = torch.from_numpy(np.load("../P_100_prior_0.0001_1e-11_2000_5.npz")["P"]).to(opt.device).float()
 
     """ prepare model """
     model = Transformer(

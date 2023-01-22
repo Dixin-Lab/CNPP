@@ -320,7 +320,7 @@ if __name__=='__main__':#30 45 10
     # thres= 0.5, w= 0.1)
     max_time=20
     num_seq=2000
-    params1, params2, pmat=prepare_dataloader('./Joint_THP/exp_100_100_2000_10.pkl')
+    params1, params2, pmat=prepare_dataloader('./Joint_THP/exp_50_50_2000_45.pkl')
     data_dict, [params1, params2]=generate_synthetic_tpps_from_graph_data(params1, params2, dim= 100,num_seq= num_seq,max_time= max_time,
     thres= 0.5, w= 0.1)
     save_pkl(data_dict, params1, params2, pmat, max_time, num_seq, output_dir='.',)
