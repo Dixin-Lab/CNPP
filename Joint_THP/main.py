@@ -77,6 +77,19 @@ def train_epoch(model, training_data_list, optimizer, pred_loss_func, opt):
     #for batch_num in range(training_data_batch_nums):
     for batch_num in tqdm(range(training_data_batch_nums), mininterval=2, desc='  - (Training)   ', leave=False):
 
+        batch_event_loss = 0  # batch_event_loss
+        batch_time_se = 0  # batch_time_se
+        batch_pred_loss = 0  # batch_pred_loss
+        batch_num_event = 0  # batch_num_event
+        batch_num_pred = 0  # batch_num_pred
+
+        batch_event_loss = None
+        batch_time_loss = None
+        batch_pred_loss = None
+
+        """ forward """
+        optimizer.zero_grad()
+
         for process_idx in range(2):
 
             batch=next(training_data_iters[process_idx])
@@ -86,8 +99,8 @@ def train_epoch(model, training_data_list, optimizer, pred_loss_func, opt):
             """ process_idx == 1 """
             if process_idx == 1:
                 event_type[event_type>0]-=model.num_types[0]
-            """ forward """
-            optimizer.zero_grad()
+            # """ forward """
+            # optimizer.zero_grad()
 
             enc_out, prediction = model(process_idx, event_type, event_time)
 
@@ -105,11 +118,24 @@ def train_epoch(model, training_data_list, optimizer, pred_loss_func, opt):
             # SE is usually large, scale it to stabilize training
             scale_time_loss = event_type.ne(constant.PAD).sum().item() - event_time.shape[0]
             scale_nll_loss=event_type.ne(constant.PAD).sum().item()
-            loss = event_loss/scale_nll_loss + pred_loss/scale_time_loss + se / scale_time_loss
-            loss.backward()
+            # loss = event_loss/scale_nll_loss + pred_loss/scale_time_loss + se / scale_time_loss
+            # loss.backward()
 
-            """ update parameters """
-            optimizer.step()
+            # 3 kinds of loss
+            if batch_event_loss is None:
+                batch_event_loss = event_loss
+                batch_pred_loss = pred_loss
+                batch_time_loss = se
+            else:
+                batch_event_loss += event_loss
+                batch_pred_loss += pred_loss
+                batch_time_loss += se
+
+            batch_num_event += scale_nll_loss  # batch_num_event
+            batch_num_pred += scale_time_loss  # batch_num_pred
+
+            # """ update parameters """
+            # optimizer.step()
 
             #print("train process_idx", process_idx, "acc",
             #      pred_num_event.item() / (event_type.ne(constant.PAD).sum().item() - event_time.shape[0]))
@@ -138,6 +164,12 @@ def train_epoch(model, training_data_list, optimizer, pred_loss_func, opt):
                 # we do not predict the first event
                 total_num_pred_1 += event_type.ne(constant.PAD).sum().item() - event_time.shape[0]
 
+        loss = batch_event_loss / batch_num_event + batch_pred_loss / batch_num_pred + batch_time_loss / batch_num_pred
+
+        loss.backward()
+
+        """ update parameters """
+        optimizer.step()
 
     rmse = np.sqrt(total_time_se / total_num_pred)
     rmse_0 = np.sqrt(total_time_se_0 / total_num_pred_0)
@@ -348,7 +380,7 @@ def main():
     #                        opt.lr, betas=(0.9, 0.999), eps=1e-05)
     optimizer = optim.SGD(filter(lambda x: x.requires_grad, model.parameters()),
                            opt.lr)
-    scheduler = optim.lr_scheduler.StepLR(optimizer, 2000, gamma=0.5)
+    scheduler = optim.lr_scheduler.StepLR(optimizer, 10, gamma=0.5)
 
     """ prediction loss function, either cross entropy or label smoothing """
     # TO DO
