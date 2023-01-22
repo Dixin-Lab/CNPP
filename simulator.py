@@ -125,10 +125,25 @@ def generate_synthetic_tpps(dim: int = 10,
 
     #return {'train': [seqs_train, seqs_len_train], 'test': [seqs_test, seqs_len_test]}, [params1, params2], pmat
 
+def generate_synthetic_tpps_from_graph_data(params1,params2,dim: int = 10,
+                            num_seq: int = 200,
+                            max_time: float = 30,
+                            thres: float = 0.5,
+                            w: float = 0.1) -> Tuple[Dict, List]:
+    # params1, params2= synthetic_hawkes_parameters(dim=dim, thres=thres)
+    seqs1, seqs_len1 = make_seq(params=params1, num_seq=num_seq, max_time=max_time, w=w)
+    seqs2, seqs_len2 = make_seq(params=params2, num_seq=num_seq, max_time=max_time, w=w)
+    for n in range(len(seqs2)):
+        seqs2[n]['ci'] = seqs2[n]['ci'] + dim
+    seqs_train = seqs1[:-100] + seqs2[:-100]
+    seqs_len_train = seqs_len1[:-100] + seqs_len2[:-100]
+    seqs_test = seqs1[-100:] + seqs2[-100:]
+    seqs_len_test = seqs_len1[-100:] + seqs_len2[-100:]
+    return {'train':seqs_train, 'test':seqs_test}, [params1, params2]
 
 
 
-def save_pkl(data_dict,params1,params2,pmat, output_dir='.'):
+def save_pkl(data_dict,params1,params2,pmat, max_time, seq_num, output_dir='.'):
     data = {}
     data['params1'] = params1
     data['params2'] = params2
@@ -139,7 +154,7 @@ def save_pkl(data_dict,params1,params2,pmat, output_dir='.'):
     num2=pmat.shape[1]
 
 
-    with open('{}/exp_{}_{}.pkl'.format(output_dir,num1,num2), 'wb') as f:
+    with open('{}/exp_{}_{}_{}_{}.pkl'.format(output_dir,num1,num2,seq_num,max_time), 'wb') as f:
         pickle.dump(data, f)
     return
 
@@ -280,7 +295,32 @@ def get_dataloader(data, batch_size, shuffle=True):
     return dl
 
 
-if __name__=='__main__':#30 45 45
-    data_dict, [params1, params2], pmat=generate_synthetic_tpps(dim= 100,num_seq= 2000,max_time= 10,
+
+
+def prepare_dataloader(path):
+    """ Load data and prepare dataloader. """
+
+    def load_data(name):
+        with open(name, 'rb') as f:
+            data = pickle.load(f)
+            num_types = [data['pmat'].shape[0],data['pmat'].shape[1]]
+
+            return data, num_types
+
+    # print('[Info] Loading train data...')
+    data, num_types = load_data(path)
+    params1 = data['params1']
+    params2 = data['params2']
+    pmat = data['pmat']
+
+    return params1,params2,pmat
+
+if __name__=='__main__':#30 45 10
+    # data_dict, [params1, params2], pmat=generate_synthetic_tpps(dim= 100,num_seq= 2000,max_time= 10,
+    # thres= 0.5, w= 0.1)
+    max_time=20
+    num_seq=2000
+    params1, params2, pmat=prepare_dataloader('./Joint_THP/exp_100_100_2000_10.pkl')
+    data_dict, [params1, params2]=generate_synthetic_tpps_from_graph_data(params1, params2, dim= 100,num_seq= num_seq,max_time= max_time,
     thres= 0.5, w= 0.1)
-    save_pkl(data_dict, params1, params2, pmat, output_dir='.')
+    save_pkl(data_dict, params1, params2, pmat, max_time, num_seq, output_dir='.',)

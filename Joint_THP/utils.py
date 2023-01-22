@@ -68,7 +68,7 @@ def log_likelihood(model, process_idx, data, time, types):
 
     all_hid = model.linear_list[process_idx](data)
     all_lambda = softplus(all_hid, torch.abs(model.beta))
-
+    #print("log_likelihood",all_lambda)
     type_lambda = torch.sum(all_lambda * type_mask, dim=2)
 
     # event log-likelihood

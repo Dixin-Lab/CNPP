@@ -35,13 +35,66 @@ def get_subsequent_mask(seq):
     return subsequent_mask
 
 
+class CoupledEmbedding(nn.Module):
+    def __init__(
+            self,
+            num_types: List, dim: int, n_iter: int = 20, P_prior=None):
+        super().__init__()
+        self.total_num = sum(num_types) + 1
+        self.num_types = num_types
+        self.n_iter = n_iter
+        self.src_emb = nn.Linear(num_types[0] + 1, dim, bias=False)
+        self.P=P_prior
+        # How to initialize coupling might be important. I am not sure.
+        self.coupling = nn.Parameter(data=torch.randn(num_types[1], num_types[0]))
+        self.f = nn.Sequential(
+            nn.Linear(dim,dim, bias=True),
+            nn.ReLU(),
+            nn.Linear(dim, num_types[1], bias=True),
+            nn.ReLU()
+        )
+
+    def sinkhorn(self):
+        # X1=torch.eye(self.num_types[0] + 1).to('cuda')
+        # #self.src_emb(X1)[1:]
+        # tau=0.1
+        # log_alpha = self.f(self.src_emb(X1)[1:]).T/tau
+        log_alpha = -self.coupling / 0.1
+        for _ in range(self.n_iter):
+            log_alpha = log_alpha - torch.logsumexp(log_alpha, -1, keepdim=True)
+            log_alpha = log_alpha - torch.logsumexp(log_alpha, -2, keepdim=True)
+        return log_alpha.exp() #* self.num_types[1]
+
+    def forward(self, process_idx, event_types: torch.Tensor):
+        """
+        :param event_types: [batch size, seq length]
+        :return:
+            [batch size, seq length, dim]
+        """
+        event_types_onehot = F.one_hot(event_types, num_classes=self.num_types[process_idx]+1)  # [batch size, seq length, total_num]
+        event_types_onehot = event_types_onehot.type(torch.FloatTensor)
+        event_types_onehot = event_types_onehot.to(event_types.device)
+        #trans = self.sinkhorn()  # num1 x num0
+        trans = (self.P).T*self.num_types[1]
+        #print("trans",trans)
+        if process_idx == 0:
+            event_types_aligned = event_types_onehot[:, :, :(self.num_types[0] + 1)].clone()
+        elif process_idx == 1:
+            event_types_aligned = event_types_onehot[:, :, :(self.num_types[0] + 1)].clone()
+            event_types_aligned[:, :, 1:] = torch.matmul(event_types_onehot[:, :, 1:],
+                                                         trans.detach())
+
+
+        return self.src_emb(event_types_aligned)
+
+
 class Encoder(nn.Module):
     """ A encoder model with self attention mechanism. """
 
     def __init__(
             self,
             num_types, d_model, d_inner,
-            n_layers, n_head, d_k, d_v, dropout):
+            n_layers, n_head, d_k, d_v, dropout, P_prior):
         super().__init__()
 
         self.d_model = d_model
@@ -54,6 +107,10 @@ class Encoder(nn.Module):
         # event type embedding
         self.event_emb_list = nn.ModuleList([nn.Embedding(event_type + 1, d_model, padding_idx=PAD)\
                              for event_type in num_types])
+
+        self.event_emb = CoupledEmbedding(num_types, d_model, n_iter=100, P_prior=P_prior)
+
+        
         self.layer_stack = nn.ModuleList([
             EncoderLayer(d_model, d_inner, n_head, d_k, d_v, dropout=dropout, normalize_before=False)
             for _ in range(n_layers)])
@@ -80,7 +137,11 @@ class Encoder(nn.Module):
         slf_attn_mask = (slf_attn_mask_keypad + slf_attn_mask_subseq).gt(0)
 
         tem_enc = self.temporal_enc(event_time, non_pad_mask)
-        enc_output = self.event_emb_list[process_idx](event_type)
+
+        #coupling
+        #enc_output = self.event_emb_list[process_idx](event_type)
+
+        enc_output = self.event_emb(process_idx,event_type)
 
         for enc_layer in self.layer_stack:
             enc_output += tem_enc
@@ -134,7 +195,7 @@ class Transformer(nn.Module):
     def __init__(
             self,
             num_types: list, d_model=256, d_rnn=128, d_inner=1024,
-            n_layers=4, n_head=4, d_k=64, d_v=64, dropout=0.1):
+            n_layers=4, n_head=4, d_k=64, d_v=64, dropout=0.1, P_prior=None):
         super().__init__()
 
         self.encoder = Encoder(
@@ -146,6 +207,7 @@ class Transformer(nn.Module):
             d_k=d_k,
             d_v=d_v,
             dropout=dropout,
+            P_prior=P_prior
         )
 
         self.num_types = num_types

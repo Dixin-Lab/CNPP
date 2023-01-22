@@ -33,7 +33,7 @@ def load_data(name):
         return data, num_types
 
 
-def get_prior_P(path0,path1):
+def get_prior_P(path0, path1, epsilon=0.0001, precision=1e-11,max_time=0, num_seq=2000):
 
     data, num_types = load_data(path0)
 
@@ -41,17 +41,17 @@ def get_prior_P(path0,path1):
     cost=a_b_cost['cost']
     a=a_b_cost['a']
 
-    epsilon = 0.0001
     distribute_a = np.ones(num_types[0]) / num_types[0]
     distribute_b = np.ones(num_types[1]) / num_types[1]
-    P, wd = sinkhorn(cost, distribute_a, distribute_b, epsilon=epsilon, precision=1e-10)
-    np.savez("P_" + str(len(a)) + "_prior" + str(epsilon) + ".npz", P=P)
+    P, wd = sinkhorn(cost, distribute_a, distribute_b, epsilon=epsilon, precision=precision)
+    np.savez("P_" + str(len(a)) + "_prior_" + str(epsilon) +"_"+str(precision)+"_"+str(num_seq)+"_"+str(max_time)+".npz", P=P)
     print("P", sum(sum(P)))
     plt.figure(figsize=(10, 5))
     plt.imshow(P)
     plt.colorbar()
     # plt.savefig('./Plot/P'+str(epsilon)+'.pdf')
     plt.show()
+    plt.close()
 
     pmat = data['pmat']
     plt.figure(figsize=(10, 5))
@@ -59,6 +59,7 @@ def get_prior_P(path0,path1):
     plt.colorbar()
     plt.savefig('./Plot/P_'+str(epsilon)+'_'+str(len(a))+'.pdf')
     plt.show()
+    plt.close()
 
 def prior_accuracy(path0,path1):
     data, num_types = load_data(path0)
@@ -73,8 +74,51 @@ def prior_accuracy(path0,path1):
 
 
 if __name__=="__main__":
-    # data,num_types=load_data("exp_100_100.pkl")
+    # data,num_types=load_data("./exp_100_100_2000_20.pkl")
+    # print(type(data['test']))
+    # train_mid=len(data['train'])//2
+    # test_mid=len(data['test'])//2
+    # need_seq_num=1500
     # train_seqs=data['train']
+    # average_intensity=torch.zeros(sum(num_types))
+    # #print(train_seqs[0])
+    # print(len(train_seqs))
+    # for idx in range(need_seq_num):
+    #     T= train_seqs[idx]['ti'][-1]
+    #     average_intensity_seq=np.zeros(sum(num_types))
+    #     #print(len(train_seqs[idx]['ci']))
+    #     for event in train_seqs[idx]['ci']:
+    #         #print("event ",type(event))
+    #         average_intensity_seq[int(event)]+=1
+    #     average_intensity_seq/=T
+    #     average_intensity=average_intensity+average_intensity_seq
+    #
+    #     T = train_seqs[idx+train_mid]['ti'][-1]
+    #     average_intensity_seq = np.zeros(sum(num_types))
+    #     for event in train_seqs[idx+train_mid]['ci']:
+    #         # print("event ",type(event))
+    #         average_intensity_seq[int(event)] += 1
+    #     average_intensity_seq /= T
+    #     average_intensity = average_intensity + average_intensity_seq
+    #
+    #
+    # average_intensity/=need_seq_num
+    #
+    # a = average_intensity[:num_types[0]].unsqueeze(-1).numpy()
+    # b = average_intensity[num_types[0]:].unsqueeze(-1).numpy()
+    # # a=a/sum(a)
+    # # b=b/sum(b)
+    # from sklearn.metrics.pairwise import euclidean_distances
+    # cost = euclidean_distances(a,b)
+    # print("a:",a)
+    # print("b:",b)
+    # print("cost",cost)
+    # np.savez("a_b_const_" + str(len(a))+"_"+str(need_seq_num)+"_20" + ".npz", a=a,b=b,cost=cost)
+
+
+    # data,num_types=load_data("./Joint_THP/exp_10_10_2000_30.pkl")
+    # data['train'].extend(data['test'])
+    # train_seqs = data['train']
     # average_intensity=torch.zeros(sum(num_types))
     # #print(train_seqs[0])
     # print(len(train_seqs))
@@ -89,7 +133,7 @@ if __name__=="__main__":
     #     #print(average_intensity_seq)
     #     average_intensity=average_intensity+average_intensity_seq
     #
-    # average_intensity/=len(train_seqs)
+    # average_intensity/=len(train_seqs)/2
     #
     # a=average_intensity[:num_types[0]].unsqueeze(-1).numpy()
     # b = average_intensity[num_types[0]:].unsqueeze(-1).numpy()
@@ -100,29 +144,23 @@ if __name__=="__main__":
     # print("a:",a)
     # print("b:",b)
     # print("cost",cost)
-    # np.savez("a_b_const_" + str(len(a)) + ".npz", a=a,b=b,cost=cost)
-    # epsilon=0.0001
-    # distribute_a=np.ones(num_types[0])/num_types[0]
-    # distribute_b = np.ones(num_types[1]) / num_types[1]
-    # P,wd=sinkhorn(cost, distribute_a,distribute_b, epsilon=epsilon, precision=1e-11)
-    # np.savez("P_"+str(len(a))+"_prior"+str(epsilon)+".npz",P=P)
-    # print("P",sum(sum(P)))
-    # plt.figure(figsize=(10, 5))
-    # plt.imshow(P)
-    # plt.colorbar()
-    # #plt.savefig('./Plot/P'+str(epsilon)+'.pdf')
-    # plt.show()
-    #
-    # pmat=data['pmat']
-    # plt.figure(figsize=(10, 5))
-    # plt.imshow(pmat)
-    # plt.colorbar()
-    # # plt.savefig('./Plot/P'+str(epsilon)+'.pdf')
-    # plt.show()
+    # np.savez("a_b_const_" + str(len(a))+"_"+str(2000)+"_30" + ".npz", a=a,b=b,cost=cost)
 
 
 
+    num_seq=2000
+    max_time=30
+    get_prior_P('./Joint_THP/exp_10_10_2000_30.pkl','a_b_const_10_2000_30.npz',epsilon=0.0001,precision=1e-11,max_time=max_time,num_seq=num_seq)
+    prior_accuracy('./Joint_THP/exp_10_10_2000_30.pkl','P_10_prior_0.0001_1e-11_2000_30.npz')
 
 
-    #get_prior_P('exp_50_50.pkl','a_b_const_50.npz')
-    prior_accuracy('exp_50_50.pkl','P_50_prior0.0001.npz')
+
+    # for i in [5,10,15,20]:
+    #     path="P_100_prior_0.0001_1e-11_"+str(i)+".npz"
+    #     P=np.load(path)['P']
+    #     plt.figure(figsize=(10, 5))
+    #     plt.imshow(P)
+    #     plt.colorbar()
+    #     plt.show()
+    #     plt.title(str(i))
+    #     plt.close()

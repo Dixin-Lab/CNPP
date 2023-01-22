@@ -53,13 +53,24 @@ def train_epoch(model, training_data_list, optimizer, pred_loss_func, opt):
     total_event_rate = 0  # cumulative number of correct prediction
     total_num_event = 0  # number of total events
     total_num_pred = 0  # number of predictions
-    
+
+    total_event_ll_0 = 0  # cumulative event log-likelihood
+    total_time_se_0 = 0  # cumulative time prediction squared-error
+    total_event_rate_0 = 0  # cumulative number of correct prediction
+    total_num_event_0 = 0  # number of total events
+    total_num_pred_0 = 0  # number of predictions
+
+    total_event_ll_1 = 0  # cumulative event log-likelihood
+    total_time_se_1 = 0  # cumulative time prediction squared-error
+    total_event_rate_1 = 0  # cumulative number of correct prediction
+    total_num_event_1 = 0  # number of total events
+    total_num_pred_1 = 0  # number of predictions
     # training_data_list: [dataloader0, dataloader1]
     # if process_idx == 1:     event_type -= model.num_types[0] !!!
 
     training_data_iters = [iter(dataloader) for dataloader in training_data_list]
 
-    training_data_batch_nums=min([len(dataloader) for dataloader in training_data_list])
+    training_data_batch_nums = min([len(dataloader) for dataloader in training_data_list])
 
     print(training_data_batch_nums)
 
@@ -92,12 +103,16 @@ def train_epoch(model, training_data_list, optimizer, pred_loss_func, opt):
             se = utils.time_loss(prediction[1], event_time)
 
             # SE is usually large, scale it to stabilize training
-            scale_time_loss = 100
-            loss = event_loss + pred_loss + se / scale_time_loss
+            scale_time_loss = event_type.ne(constant.PAD).sum().item() - event_time.shape[0]
+            scale_nll_loss=event_type.ne(constant.PAD).sum().item()
+            loss = event_loss/scale_nll_loss + pred_loss/scale_time_loss + se / scale_time_loss
             loss.backward()
 
             """ update parameters """
             optimizer.step()
+
+            #print("train process_idx", process_idx, "acc",
+            #      pred_num_event.item() / (event_type.ne(constant.PAD).sum().item() - event_time.shape[0]))
 
             """ note keeping """
             total_event_ll += -event_loss.item()
@@ -107,7 +122,29 @@ def train_epoch(model, training_data_list, optimizer, pred_loss_func, opt):
             # we do not predict the first event
             total_num_pred += event_type.ne(constant.PAD).sum().item() - event_time.shape[0]
 
+            """ note keeping process_idx """
+            if process_idx == 0:
+                total_event_ll_0 += -event_loss.item()
+                total_time_se_0 += se.item()
+                total_event_rate_0 += pred_num_event.item()
+                total_num_event_0 += event_type.ne(constant.PAD).sum().item()
+                # we do not predict the first event
+                total_num_pred_0 += event_type.ne(constant.PAD).sum().item() - event_time.shape[0]
+            else :
+                total_event_ll_1 += -event_loss.item()
+                total_time_se_1 += se.item()
+                total_event_rate_1 += pred_num_event.item()
+                total_num_event_1 += event_type.ne(constant.PAD).sum().item()
+                # we do not predict the first event
+                total_num_pred_1 += event_type.ne(constant.PAD).sum().item() - event_time.shape[0]
+
+
     rmse = np.sqrt(total_time_se / total_num_pred)
+    rmse_0 = np.sqrt(total_time_se_0 / total_num_pred_0)
+    rmse_1 = np.sqrt(total_time_se_1 / total_num_pred_1)
+
+    print("train epoch process 0",total_event_ll_0 / total_num_event_0, total_event_rate_0 / total_num_pred_0, rmse_0)
+    print("train epoch process 1", total_event_ll_1 / total_num_event_1, total_event_rate_1 / total_num_pred_1, rmse_1)
     return total_event_ll / total_num_event, total_event_rate / total_num_pred, rmse
 
 # TODO
@@ -121,6 +158,19 @@ def eval_epoch(model, validation_data_list, pred_loss_func, opt):
     total_event_rate = 0  # cumulative number of correct prediction
     total_num_event = 0  # number of total events
     total_num_pred = 0  # number of predictions
+
+    total_event_ll_0 = 0  # cumulative event log-likelihood
+    total_time_se_0 = 0  # cumulative time prediction squared-error
+    total_event_rate_0 = 0  # cumulative number of correct prediction
+    total_num_event_0 = 0  # number of total events
+    total_num_pred_0 = 0  # number of predictions
+
+    total_event_ll_1 = 0  # cumulative event log-likelihood
+    total_time_se_1 = 0  # cumulative time prediction squared-error
+    total_event_rate_1 = 0  # cumulative number of correct prediction
+    total_num_event_1 = 0  # number of total events
+    total_num_pred_1 = 0  # number of predictions
+
     with torch.no_grad():
 
         # training_data_list: [dataloader0, dataloader1]
@@ -155,6 +205,7 @@ def eval_epoch(model, validation_data_list, pred_loss_func, opt):
                 _, pred_num = utils.type_loss(prediction[0], event_type, pred_loss_func[process_idx])
                 se = utils.time_loss(prediction[1], event_time)
 
+                #print("eval process_idx",process_idx,"acc",pred_num.item()/(event_type.ne(constant.PAD).sum().item() - event_time.shape[0]))
                 """ note keeping """
                 total_event_ll += -event_loss.item()
                 total_time_se += se.item()
@@ -162,7 +213,29 @@ def eval_epoch(model, validation_data_list, pred_loss_func, opt):
                 total_num_event += event_type.ne(constant.PAD).sum().item()
                 total_num_pred += event_type.ne(constant.PAD).sum().item() - event_time.shape[0]
 
+                """ note keeping process_idx """
+                if process_idx == 0:
+                    total_event_ll_0 += -event_loss.item()
+                    total_time_se_0 += se.item()
+                    total_event_rate_0 += pred_num.item()
+                    total_num_event_0 += event_type.ne(constant.PAD).sum().item()
+                    # we do not predict the first event
+                    total_num_pred_0 += event_type.ne(constant.PAD).sum().item() - event_time.shape[0]
+                else:
+                    total_event_ll_1 += -event_loss.item()
+                    total_time_se_1 += se.item()
+                    total_event_rate_1 += pred_num.item()
+                    total_num_event_1 += event_type.ne(constant.PAD).sum().item()
+                    # we do not predict the first event
+                    total_num_pred_1 += event_type.ne(constant.PAD).sum().item() - event_time.shape[0]
+
     rmse = np.sqrt(total_time_se / total_num_pred)
+    rmse_0 = np.sqrt(total_time_se_0 / total_num_pred_0)
+    rmse_1 = np.sqrt(total_time_se_1 / total_num_pred_1)
+
+    #print("train epoch process 0", total_event_ll_0 / total_num_event_0, total_event_rate_0 / total_num_pred_0, rmse_0)
+    #print("train epoch process 1", total_event_ll_1 / total_num_event_1, total_event_rate_1 / total_num_pred_1, rmse_1)
+
     return total_event_ll / total_num_event, total_event_rate / total_num_pred, rmse
 
 
@@ -178,14 +251,14 @@ def train(model, training_data_list, validation_data_list, optimizer, scheduler,
 
         start = time.time()
         train_event, train_type, train_time = train_epoch(model, training_data_list, optimizer, pred_loss_func, opt)
-        print('  - (Training)    loglikelihood: {ll: 8.5f}, '
+        print('  -Total (Training)    loglikelihood: {ll: 8.5f}, '
             'accuracy: {type: 8.5f}, RMSE: {rmse: 8.5f}, '
             'elapse: {elapse:3.3f} min'
             .format(ll=train_event, type=train_type, rmse=train_time, elapse=(time.time() - start) / 60))
 
         start = time.time()
         valid_event, valid_type, valid_time = eval_epoch(model, validation_data_list, pred_loss_func, opt)
-        print('  - (Testing)     loglikelihood: {ll: 8.5f}, '
+        print('  -Total (Testing)     loglikelihood: {ll: 8.5f}, '
             'accuracy: {type: 8.5f}, RMSE: {rmse: 8.5f}, '
             'elapse: {elapse:3.3f} min'
             .format(ll=valid_event, type=valid_type, rmse=valid_time, elapse=(time.time() - start) / 60))
@@ -211,9 +284,9 @@ def main():
 
     parser = argparse.ArgumentParser()
 
-    parser.add_argument('-data', default="./exp_10_10_2000.pkl")
+    parser.add_argument('-data', default="./exp_10_10_2000_30.pkl")
 
-    parser.add_argument('-epoch', type=int, default=30)
+    parser.add_argument('-epoch', type=int, default=50)
     parser.add_argument('-batch_size', type=int, default=16)
 
     parser.add_argument('-d_model', type=int, default=64)
@@ -226,7 +299,7 @@ def main():
     parser.add_argument('-n_layers', type=int, default=4)
 
     parser.add_argument('-dropout', type=float, default=0.1)
-    parser.add_argument('-lr', type=float, default=0.0001)
+    parser.add_argument('-lr', type=float, default=0.001)
     parser.add_argument('-smooth', type=float, default=0.1)
 
     parser.add_argument('-log', type=str, default='log.txt')
@@ -252,6 +325,9 @@ def main():
     training_data_list = [trainloader_0, trainloader_1]
     validation_data_list = [testloader_0, testloader_1]
 
+    """ read P_prior """
+    P_prior = torch.from_numpy(np.load("P_10_prior0.0001.npz")["P"]).to(opt.device).float()
+
     """ prepare model """
     model = Transformer(
         num_types=num_types,
@@ -263,6 +339,7 @@ def main():
         d_k=opt.d_k,
         d_v=opt.d_v,
         dropout=opt.dropout,
+        P_prior=P_prior
     )
     model.to(opt.device)
 
@@ -271,7 +348,7 @@ def main():
     #                        opt.lr, betas=(0.9, 0.999), eps=1e-05)
     optimizer = optim.SGD(filter(lambda x: x.requires_grad, model.parameters()),
                            opt.lr)
-    scheduler = optim.lr_scheduler.StepLR(optimizer, 1000, gamma=0.5)
+    scheduler = optim.lr_scheduler.StepLR(optimizer, 2000, gamma=0.5)
 
     """ prediction loss function, either cross entropy or label smoothing """
     # TO DO
