@@ -77,9 +77,6 @@ def train_epoch(model, training_data_list, optimizer, pred_loss_func, opt):
     #for batch_num in range(training_data_batch_nums):
     for batch_num in tqdm(range(training_data_batch_nums), mininterval=2, desc='  - (Training)   ', leave=False):
 
-        batch_event_loss = 0  # batch_event_loss
-        batch_time_se = 0  # batch_time_se
-        batch_pred_loss = 0  # batch_pred_loss
         batch_num_event = 0  # batch_num_event
         batch_num_pred = 0  # batch_num_pred
 
