@@ -114,9 +114,9 @@ if __name__=="__main__":
     # print("b:",b)
     # print("cost",cost)
     # np.savez("a_b_const_" + str(len(a))+"_"+str(need_seq_num)+"_20" + ".npz", a=a,b=b,cost=cost)
-
-
-    # data,num_types=load_data("./Joint_THP/exp_10_10_2000_30.pkl")
+    #
+    #
+    # data,num_types=load_data("./Joint_THP/exp_50_50_2000_45.pkl")
     # data['train'].extend(data['test'])
     # train_seqs = data['train']
     # average_intensity=torch.zeros(sum(num_types))
@@ -144,14 +144,14 @@ if __name__=="__main__":
     # print("a:",a)
     # print("b:",b)
     # print("cost",cost)
-    # np.savez("a_b_const_" + str(len(a))+"_"+str(2000)+"_30" + ".npz", a=a,b=b,cost=cost)
+    # np.savez("a_b_const_" + str(len(a))+"_"+str(2000)+"_45" + ".npz", a=a,b=b,cost=cost)
 
 
 
     num_seq=2000
-    max_time=30
-    get_prior_P('./Joint_THP/exp_10_10_2000_30.pkl','a_b_const_10_2000_30.npz',epsilon=0.0001,precision=1e-11,max_time=max_time,num_seq=num_seq)
-    prior_accuracy('./Joint_THP/exp_10_10_2000_30.pkl','P_10_prior_0.0001_1e-11_2000_30.npz')
+    max_time=45
+    #get_prior_P('./Joint_THP/exp_50_50_2000_45.pkl','a_b_const_50_2000_45.npz',epsilon=0.0001,precision=1e-11,max_time=max_time,num_seq=num_seq)
+    prior_accuracy('./Joint_THP/exp_50_50_2000_45.pkl','P_50_prior_0.0001_1e-11_2000_45.npz')
 
 
 

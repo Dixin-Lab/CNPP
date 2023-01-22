@@ -77,7 +77,7 @@ def log_likelihood(model, process_idx, data, time, types):
     event_ll = torch.sum(event_ll, dim=-1)
 
     # non-event log-likelihood, either numerical integration or MC integration
-    # non_event_ll = compute_integral_biased(type_lambda, time, non_pad_mask)
+    #non_event_ll = compute_integral_biased(type_lambda, time, non_pad_mask)
     non_event_ll = compute_integral_unbiased(model, process_idx, data, time, non_pad_mask, type_mask)
     non_event_ll = torch.sum(non_event_ll, dim=-1)
 
@@ -101,7 +101,8 @@ def type_loss(prediction, types, loss_func):
         loss = loss_func(prediction.transpose(1, 2), truth)
     # print("type_loss loss",loss,"loss shape",loss.shape,"sum loss",torch.sum(loss))
     loss_r = torch.sum(loss)
-    return loss_r, correct_num
+
+    return loss_r, correct_num, list(truth.cpu().detach().view(-1).numpy()), list(pred_type.cpu().detach().view(-1).numpy())
 
 
 def time_loss(prediction, event_time):

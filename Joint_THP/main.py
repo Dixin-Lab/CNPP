@@ -107,7 +107,7 @@ def train_epoch(model, training_data_list, optimizer, pred_loss_func, opt):
             event_loss = -torch.sum(event_ll - non_event_ll)
 
             # type prediction
-            pred_loss, pred_num_event = utils.type_loss(prediction[0], event_type, pred_loss_func[process_idx])
+            pred_loss, pred_num_event, _, _ = utils.type_loss(prediction[0], event_type, pred_loss_func[process_idx])
 
             # time prediction
             se = utils.time_loss(prediction[1], event_time)
@@ -200,6 +200,10 @@ def eval_epoch(model, validation_data_list, pred_loss_func, opt):
     total_num_event_1 = 0  # number of total events
     total_num_pred_1 = 0  # number of predictions
 
+    true_0 = []
+    true_1 = []
+    pred_0 = []
+    pred_1 = []
     with torch.no_grad():
 
         # training_data_list: [dataloader0, dataloader1]
@@ -231,7 +235,16 @@ def eval_epoch(model, validation_data_list, pred_loss_func, opt):
                 """ compute loss """
                 event_ll, non_event_ll = utils.log_likelihood(model,  process_idx, enc_out, event_time, event_type)
                 event_loss = -torch.sum(event_ll - non_event_ll)
-                _, pred_num = utils.type_loss(prediction[0], event_type, pred_loss_func[process_idx])
+
+                _, pred_num, true_list, pred_list= utils.type_loss(prediction[0], event_type, pred_loss_func[process_idx])
+                """ f1 score """
+                if process_idx == 0:
+                    true_0.extend(true_list)
+                    pred_0.extend(pred_list)
+                else:
+                    true_1.extend(true_list)
+                    pred_1.extend(pred_list)
+
                 se = utils.time_loss(prediction[1], event_time)
 
                 #print("eval process_idx",process_idx,"acc",pred_num.item()/(event_type.ne(constant.PAD).sum().item() - event_time.shape[0]))
@@ -262,9 +275,20 @@ def eval_epoch(model, validation_data_list, pred_loss_func, opt):
     rmse_0 = np.sqrt(total_time_se_0 / total_num_pred_0)
     rmse_1 = np.sqrt(total_time_se_1 / total_num_pred_1)
 
-    #print("train epoch process 0", total_event_ll_0 / total_num_event_0, total_event_rate_0 / total_num_pred_0, rmse_0)
-    #print("train epoch process 1", total_event_ll_1 / total_num_event_1, total_event_rate_1 / total_num_pred_1, rmse_1)
+    print("test epoch process 0", total_event_ll_0 / total_num_event_0, total_event_rate_0 / total_num_pred_0, rmse_0)
+    print("test epoch process 1", total_event_ll_1 / total_num_event_1, total_event_rate_1 / total_num_pred_1, rmse_1)
 
+    from sklearn.metrics import f1_score
+    f1_0=f1_score(true_0, pred_0, average='micro')
+    f1_1=f1_score(true_1, pred_1, average='micro')
+    true_1_ = list(map(lambda x: x +model.num_types[0], true_1))
+    pred_1_ = list(map(lambda x: x + model.num_types[0], pred_1))
+    true_1_.extend(true_0)
+    pred_1_.extend(pred_0)
+    f1_total=f1_score(true_1_,pred_1_, average='micro')
+    print("test epoch process 0, f1 score",f1_0)
+    print("test epoch process 1, f1 score", f1_1)
+    print("test epoch total, f1 score", f1_total)
     return total_event_ll / total_num_event, total_event_rate / total_num_pred, rmse
 
 
@@ -316,6 +340,7 @@ def main():
     parser.add_argument('-data', default="./exp_10_10_2000_30.pkl")
 
     parser.add_argument('-epoch', type=int, default=50)
+    parser.add_argument('-lr', type=float, default=0.001)
     parser.add_argument('-batch_size', type=int, default=16)
 
     parser.add_argument('-d_model', type=int, default=64)
@@ -328,7 +353,7 @@ def main():
     parser.add_argument('-n_layers', type=int, default=4)
 
     parser.add_argument('-dropout', type=float, default=0.1)
-    parser.add_argument('-lr', type=float, default=0.001)
+
     parser.add_argument('-smooth', type=float, default=0.1)
 
     parser.add_argument('-log', type=str, default='log.txt')
@@ -355,7 +380,7 @@ def main():
     validation_data_list = [testloader_0, testloader_1]
 
     """ read P_prior """
-    P_prior = torch.from_numpy(np.load("P_10_prior0.0001.npz")["P"]).to(opt.device).float()
+    P_prior = torch.from_numpy(np.load("P_10_prior_0.0001_1e-11_2000_30.npz")["P"]).to(opt.device).float()
 
     """ prepare model """
     model = Transformer(
@@ -389,6 +414,7 @@ def main():
         pred_loss_func0 = nn.CrossEntropyLoss(ignore_index=-1, reduction='none')
         pred_loss_func1 = nn.CrossEntropyLoss(ignore_index=-1, reduction='none')
         pred_loss_func = [pred_loss_func0, pred_loss_func1]
+
 
     train(model, training_data_list, validation_data_list, optimizer, scheduler, pred_loss_func, opt)
 
