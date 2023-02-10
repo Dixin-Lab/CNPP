@@ -54,12 +54,12 @@ class CoupledEmbedding(nn.Module):
         )
 
     def sinkhorn(self):
-        if not self.is_param:
-            return F.relu(self.P_.T)
-
-        X1=torch.eye(self.num_types[0] + 1).to('cuda')
         tau=0.1
-        log_alpha = -self.f(self.src_emb(X1)[1:]).T/tau
+        if self.is_param:
+            X1=torch.eye(self.num_types[0] + 1).to('cuda')
+            log_alpha = -self.f(self.src_emb(X1)[1:]).T/tau
+        if not self.is_param:
+            log_alpha = -self.coupling/ tau
 
         for _ in range(self.n_iter):
             log_alpha = log_alpha - torch.logsumexp(log_alpha, -1, keepdim=True)

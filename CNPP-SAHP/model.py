@@ -97,12 +97,12 @@ class CoupledEmbedding(nn.Module):
         )
 
     def sinkhorn(self):
-        if not self.is_param:
-            return F.relu(self.P_.T)
-        X1=torch.eye(self.num_types[0] + 1).to('cuda')
-        # #self.src_emb(X1)[1:]
         tau=0.1
-        log_alpha = -self.f(self.src_emb(X1)[1:]).T/tau
+        if self.is_param:
+            X1=torch.eye(self.num_types[0] + 1).to('cuda')
+            log_alpha = -self.f(self.src_emb(X1)[1:]).T/tau
+        if not self.is_param:
+            log_alpha = -self.coupling/ tau
 
         for _ in range(self.n_iter):
             log_alpha = log_alpha - torch.logsumexp(log_alpha, -1, keepdim=True)
@@ -148,7 +148,7 @@ class Encoder(nn.Module):
         self.temporal_enc = BiasedPositionalEmbedding(d_model)
 
         # coupling emb
-        self.event_emb = CoupledEmbedding(num_types, d_model, n_iter=100, P_prior=P_prior,is_param=is_param)
+        self.event_emb = CoupledEmbedding(num_types, d_model, n_iter=30, P_prior=P_prior,is_param=is_param)
 
         # event type embedding
         self.event_emb_list = nn.ModuleList([nn.Embedding(event_type + 1, d_model, padding_idx=PAD) \
@@ -291,7 +291,7 @@ class SAHP(nn.Module):
     def compute_integral_unbiased(self, process_idx, data, time, non_pad_mask, type_mask):
         """ Log-likelihood of non-events, using Monte Carlo integration. """
 
-        num_samples = 100
+        num_samples = 50
 
         diff_time = (torch.cat([time[:, 0].reshape(-1, 1), time[:, 1:] - time[:, :-1]], dim=1)) * non_pad_mask[:, :]
 

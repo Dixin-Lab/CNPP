@@ -11,9 +11,8 @@ from tqdm import tqdm
 from data_util import get_dataloader
 from constant import PAD
 from utils import LabelSmoothingLoss
-from utils import log_likelihood,type_loss,time_loss
-from  model import Transformer
-
+from utils import log_likelihood, type_loss, time_loss
+from model import Transformer
 
 
 def prepare_dataloader(opt, train_ratio=0.8):
@@ -32,8 +31,8 @@ def prepare_dataloader(opt, train_ratio=0.8):
     params2 = data['params2']
     pmat = data['pmat']
 
-    total_data0 = data['seq1']
-    total_data1 = data['seq2']
+    total_data0 = data['seq1'][:opt.seq_num]
+    total_data1 = data['seq2'][:opt.seq_num]
 
     len0 = len(total_data0)
     len1 = len(total_data1)
@@ -51,7 +50,6 @@ def prepare_dataloader(opt, train_ratio=0.8):
 
     valloader_0 = get_dataloader(data=total_data0[test_len0 + train_len0:], batch_size=opt.batch_size)
     valloader_1 = get_dataloader(data=total_data1[test_len1 + train_len1:], batch_size=opt.batch_size)
-
 
     return valloader_0, valloader_1, trainloader_0, trainloader_1, testloader_0, testloader_1, num_types, params1, params2, pmat
 
@@ -129,7 +127,6 @@ def train_epoch(model, training_data_list, optimizer, pred_loss_func, opt):
             scale_time_loss = event_type.ne(PAD).sum().item() - event_time.shape[0]
             scale_nll_loss = event_type.ne(PAD).sum().item()
 
-
             # 3 kinds of loss
             if batch_event_loss is None:
                 batch_event_loss = event_loss
@@ -173,9 +170,7 @@ def train_epoch(model, training_data_list, optimizer, pred_loss_func, opt):
                 # we do not predict the first event
                 total_num_pred_1 += event_type.ne(PAD).sum().item() - event_time.shape[0]
 
-
-
-        if opt.isKL :
+        if opt.isKL:
             trans = model.encoder.event_emb.sinkhorn().T
             trans = trans / torch.sum(trans)
 
@@ -185,12 +180,14 @@ def train_epoch(model, training_data_list, optimizer, pred_loss_func, opt):
 
             ot_loss = KL_div(trans.log(), model.encoder.event_emb.P)
 
-            loss = batch_event_loss / batch_num_event + batch_pred_loss / batch_num_pred \
-                   + batch_time_loss / batch_num_pred  + ot_loss*opt.KL_tau
+            loss = batch_event_loss / batch_num_event + ot_loss * opt.KL_tau
+            # + batch_pred_loss / batch_num_pred \
+
+            # + batch_time_loss / batch_num_pred
         else:
 
-            loss = batch_event_loss / batch_num_event + batch_pred_loss / batch_num_pred \
-                   + batch_time_loss / batch_num_pred
+            loss = batch_event_loss / batch_num_event  # + batch_pred_loss / batch_num_pred \
+            # + batch_time_loss / batch_num_pred
 
             # loss = batch_event_loss / batch_num_event + batch_pred_loss / batch_num_pred + batch_time_loss / batch_num_pred
 
@@ -335,7 +332,7 @@ def eval_epoch(model, validation_data_list, pred_loss_func, opt):
     print("test epoch process 0, f1 score", f1_0)
     print("test epoch process 1, f1 score", f1_1)
     print("test epoch total, f1 score", f1_total)
-    return ll, pre, rmse,f1_total
+    return ll, pre, rmse, f1_total
 
 
 def train(model, training_data_list, validation_data_list, test_data_list, optimizer, scheduler, pred_loss_func: list,
@@ -362,7 +359,7 @@ def train(model, training_data_list, validation_data_list, test_data_list, optim
               .format(ll=train_event, type=train_type, rmse=train_time, elapse=(time.time() - start) / 60))
 
         start = time.time()
-        valid_event, valid_type, valid_time,val_f1 = eval_epoch(model, validation_data_list, pred_loss_func, opt)
+        valid_event, valid_type, valid_time, val_f1 = eval_epoch(model, validation_data_list, pred_loss_func, opt)
         print('  -Total (Valid)     loglikelihood: {ll: 8.5f}, '
               'accuracy: {type: 8.5f}, RMSE: {rmse: 8.5f}, '
               'elapse: {elapse:3.3f} min'
@@ -375,7 +372,7 @@ def train(model, training_data_list, validation_data_list, test_data_list, optim
               'Maximum accuracy: {pred: 12.8f}, Minimum RMSE: {rmse: 8.5f}'
               .format(event=max(valid_event_losses), pred=max(valid_pred_losses), rmse=min(valid_rmse)))
 
-        test_event, test_type, test_time,test_f1 = eval_epoch(model, test_data_list, pred_loss_func, opt)
+        test_event, test_type, test_time, test_f1 = eval_epoch(model, test_data_list, pred_loss_func, opt)
         print('  -Total (Testing)     loglikelihood: {ll: 8.5f}, '
               'accuracy: {type: 8.5f}, RMSE: {rmse: 8.5f}, '
               'elapse: {elapse:3.3f} min'
@@ -391,46 +388,38 @@ def train(model, training_data_list, validation_data_list, test_data_list, optim
         # logging
         with open(opt.log, 'a') as f:
             f.write('val {epoch}, {ll: 8.5f}, {acc: 8.5f}, {rmse: 8.5f}, {f1: 8.5f}\n'
-                    .format(epoch=epoch, ll=valid_event, acc=valid_type, rmse=valid_time,f1=val_f1))
+                    .format(epoch=epoch, ll=valid_event, acc=valid_type, rmse=valid_time, f1=val_f1))
 
             f.write('test {epoch}, {ll: 8.5f}, {acc: 8.5f}, {rmse: 8.5f}, {f1: 8.5f}\n'
-                    .format(epoch=epoch, ll=test_event, acc=test_type, rmse=test_time,f1=test_f1))
-        # X1 = model.encoder.event_emb_list[0].weight.cpu().detach()[1:].numpy()
-        # X2 = model.encoder.event_emb_list[1].weight.cpu().detach()[1:].numpy()
-        # from sklearn.metrics.pairwise import cosine_similarity
-        # cosine_dis = cosine_similarity(X1, X2)
-        # from Joint_sahp.metric import acc_score_P
-        for topk in [1, 3, 5,10 ,30,50,100]:
-            # model.encoder.event_emb.sinkhorn().T.cpu().detach().numpy()
+                    .format(epoch=epoch, ll=test_event, acc=test_type, rmse=test_time, f1=test_f1))
+
+        for topk in [1, 3, 5, 10, 30, 50, 100]:
             # acc_score_P(model.encoder.event_emb.sinkhorn().T.cpu().detach().numpy(), gnd=gnd_pair[:, ], topk=topk)
-            score= acc_score_P(model.encoder.event_emb.sinkhorn().T.cpu().detach().numpy(), gnd=gnd_pair[:, ], topk=topk)
+            score = acc_score_P(model.encoder.event_emb.sinkhorn().T.cpu().detach().numpy(), gnd=gnd_pair[:, ],
+                                topk=topk)
 
             with open(opt.log, 'a') as f:
                 f.write('top {top}, {score: 8.5f}\n'
-                        .format(top=topk,score=score))
-
+                        .format(top=topk, score=score))
 
         scheduler.step()
 
 
-def main(path0, path1,log_path,tau,isKL=True,is_param=False):
+def main(path0, path1, log_path, tau, isKL=True, is_param=False, seq_num=10000):
     """ Main function. """
 
     parser = argparse.ArgumentParser()
 
     parser.add_argument('-data', default=path0)
 
-    parser.add_argument('-epoch', type=int, default=50)
+    parser.add_argument('-epoch', type=int, default=15)
     parser.add_argument('-lr', type=float, default=0.001)
     parser.add_argument('-batch_size', type=int, default=16)
 
     parser.add_argument('-d_model', type=int, default=64)
 
-
     parser.add_argument('-d_inner_hid', type=int, default=128)
     parser.add_argument('-d_rnn', type=int, default=256)
-
-
 
     parser.add_argument('-d_k', type=int, default=16)
     parser.add_argument('-d_v', type=int, default=16)
@@ -447,6 +436,7 @@ def main(path0, path1,log_path,tau,isKL=True,is_param=False):
     parser.add_argument('-isKL', type=bool, default=isKL)
     parser.add_argument('-is_param', type=bool, default=is_param)
     parser.add_argument('-KL_tau', type=float, default=tau)
+    parser.add_argument('-seq_num', type=int, default=seq_num)
     opt = parser.parse_known_args()[0]
 
     # default device is CUDA
@@ -492,8 +482,7 @@ def main(path0, path1,log_path,tau,isKL=True,is_param=False):
     """ optimizer and scheduler """
     optimizer = optim.Adam(filter(lambda x: x.requires_grad, model.parameters()),
                            opt.lr, betas=(0.9, 0.999), eps=1e-05)
-    # optimizer = optim.SGD(filter(lambda x: x.requires_grad, model.parameters()),
-    #                       opt.lr)
+
     scheduler = optim.lr_scheduler.StepLR(optimizer, 10, gamma=0.5)
 
     """ prediction loss function, either cross entropy or label smoothing """
@@ -509,6 +498,13 @@ def main(path0, path1,log_path,tau,isKL=True,is_param=False):
 
     train(model, training_data_list, validation_data_list, test_data_list, optimizer, scheduler, pred_loss_func, opt,
           gnd_pair)
+
+    import matplotlib.pyplot as plt
+    plt.figure()
+    plt.imshow(model.encoder.event_emb.sinkhorn().T.cpu().detach().numpy())
+    plt.colorbar()
+    plt.savefig(path0 + "pred.pdf")
+    plt.close()
 
 
 import random
@@ -541,57 +537,105 @@ def topk_alignment_score(sim, gnd, topk, right=1):
 
 def acc_score_P(P, gnd, topk=5):
     dis = P
-    score=topk_alignment_score(dis, gnd, topk, right=1)
-    print("topk", topk, "score:",score)
+    score = topk_alignment_score(dis, gnd, topk, right=1)
+    print("topk", topk, "score:", score)
     return score
-
 
 
 if __name__ == '__main__':
 
-    # for path in [("./Tpp_data/Syn_data/unweighted/exp/exp_100_100_2000_3_idx", 3
-    #               , 'lambda1_lambda2_const_100_2000_3_'
-    #               , "./Tpp_data/Syn_data/unweighted/prior/P_100_prior_0.0001_10000_2000_3_idx_")
-    #     , ("./Tpp_data/Syn_data/unweighted/exp/exp_10_10_2000_15_idx", 15
+    # for path in [
+    #     ("./Tpp_data/Syn_data/unweighted/exp/exp_10_10_2000_15_idx", 15
     #        , 'lambda1_lambda2_const_10_2000_15_'
     #        , "./Tpp_data/Syn_data/unweighted/prior/P_10_prior_0.0001_10000_2000_15_idx_")
+    #     ,
+    #     ("./Tpp_data/Syn_data/unweighted/exp/exp_100_100_2000_3_idx", 3
+    #      , 'lambda1_lambda2_const_100_2000_3_'
+    #      , "./Tpp_data/Syn_data/unweighted/prior/P_100_prior_0.0001_10000_2000_3_idx_")
     #     , ("./Tpp_data/Syn_data/unweighted/exp/exp_50_50_2000_6_idx", 6
     #        , 'lambda1_lambda2_const_50_2000_6_'
     #        , "./Tpp_data/Syn_data/unweighted/prior/P_50_prior_0.0001_10000_2000_6_idx_")]:
     #
+    #
+    #
+    # # for path in [("./Tpp_data/Real_data/exp/exp_2708_2708_10000_2.3_idx", 2.3
+    # #         , 'lambda1_lambda2_const_2708_10000_2.3_'
+    # #         , "./Tpp_data/Real_data/prior/P_2708_prior_0.0001_10000_10000_2.3_idx_"),
+    # #
+    # #              ("./Tpp_data/Real_data/exp/exp_1135_1135_10000_1_idx", 1
+    # #               , 'lambda1_lambda2_const_1135_10000_1_'
+    # #               , "./Tpp_data/Real_data/prior/P_1135_prior_0.0001_10000_10000_1_idx_"),
+    # #
+    # #              ("./Tpp_data/Real_data/exp/exp_1000_1003_10000_0.5_idx", 0.5
+    # #               , 'lambda1_lambda2_const_1000_10000_0.5_'
+    # #               , "./Tpp_data/Real_data/prior/P_1000_prior_0.01_10000_10000_0.5_idx_")
+    # # ]:
+    #     tau=100
     #     for idx in range(5):
     #         plk_path = path[0] + str(idx) + ".pkl"
     #         log_path="./Log/Syn_data_log/parameter/parameter_with_KL/"+path[2][22:]+"idx"+str(idx)+"_tau"+str(tau)+".txt"
     #         Ppath = path[3] + str(idx) + ".npz"
-    #         main(plk_path, Ppath ,log_path=log_path,tau=1,isKL=True,is_param=False
+    #         main(plk_path, Ppath ,log_path=log_path,tau=tau,isKL=True,is_param=True
     #              )
 
+    # path = ("./Tpp_data/Real_data/exp/exp_1135_1135_10000_1_idx", 1
+    #         , 'lambda1_lambda2_const_1135_10000_1_'
+    #         , "./Tpp_data/Real_data/prior/P_1135_prior_0.0001_10000_10000_1_idx_")
 
-    path=("./Tpp_data/Real_data/exp/exp_50_50_2000_6_idx", 6
-           , 'lambda1_lambda2_const_50_2000_6_'
-           , "./Tpp_data/Real_data/prior/P_50_prior_0.0001_10000_2000_6_idx_")
+    path = ("./Tpp_data/Real_data/exp/exp_1135_1135_10000_1_idx", 1
+            , 'lambda1_lambda2_const_1135_', '_1_'
+            , './Tpp_data/Real_data/prior/P_1135_prior_0.0001_10000_', '_1_idx_')
 
+    for is_param in [True]:
+        for tau in [100]:
+            for seq_num in [3000, 5000, 8000]:
+                for idx in range(5):
+                    plk_path = path[0] + str(idx) + ".pkl"
 
-    for is_param in [True,False]:
-        for tau in [0.01,0,1,100]:
-            for idx in range(5):
-                plk_path = path[0] + str(idx) + ".pkl"
+                    if is_param:
+                        log_path = "./Log/Real_data_log/parameter/parameter_with_KL/" + path[2][22:] + str(seq_num) + \
+                                   path[3] + "idx" + str(
+                            idx) + "_tau" + str(tau) + ".txt"
+                        print("111111111111111111", log_path)
+                        Ppath = path[4] + str(seq_num) + path[5] + str(idx) + ".npz"
 
-                if is_param:
-                    log_path = "./Log/Real_data_log/parameter/parameter_with_KL/" + path[2][22:] + "idx" + str(
-                        idx) + "_tau" + str(tau) + ".txt"
+                        main(plk_path, Ppath, log_path=log_path, tau=tau, isKL=True, is_param=is_param
+                             , seq_num=seq_num)
+                    else:
+                        log_path = "./Log/Real_data_log/non_parameter/non_parameter_with_KL/" + path[2][22:] + str(
+                            seq_num) + path[3] + "idx" + str(
+                            idx) + "_tau" + str(tau) + ".txt"
 
-                    Ppath = path[3] + str(idx) + ".npz"
-                    main(plk_path, Ppath, log_path=log_path, tau=tau, isKL=True, is_param=is_param
-                         )
-                else:
-                    log_path = "./Log/Real_data_log/non_parameter/non_parameter_with_KL/" + path[2][22:] + "idx" + str(
-                        idx) + "_tau" + str(tau) + ".txt"
+                        Ppath = path[4] + str(seq_num) + path[5] + str(idx) + ".npz"
 
-                    Ppath = path[3] + str(idx) + ".npz"
-                    main(plk_path, Ppath, log_path=log_path, tau=tau, isKL=True, is_param=is_param
-                         )
+                        main(plk_path, Ppath, log_path=log_path, tau=tau, isKL=True, is_param=is_param
+                             , seq_num=seq_num)
+    # path = ("./Tpp_data/Syn_data/unweighted/exp/exp_100_100_2000_3_idx", 3
+    #      , 'lambda1_lambda2_const_100_2000_3_'
+    #      , "./Tpp_data/Syn_data/unweighted/prior/P_100_prior_0.0001_10000_2000_3_idx_")
+    path = ("./Tpp_data/Syn_data/unweighted/exp/exp_100_100_2000_3_idx", 3
+            , 'lambda1_lambda2_const_100_', '_3_'
+            , '/Tpp_data/Syn_data/unweighted/prior/P_100_prior_0.0001_10000_', '_3_idx_')
+    for is_param in [True]:
+        for tau in [100]:
+            for seq_num in [3000, 5000, 8000]:
+                for idx in range(5):
+                    plk_path = path[0] + str(idx) + ".pkl"
 
+                    if is_param:
+                        log_path = "./Log/Syn_data_log/parameter/parameter_with_KL/" + path[2][22:] + "idx" + str(
+                            idx) + "_tau" + str(tau) + "seq_num" + str(seq_num) + ".txt"
 
+                        Ppath = path[4] + str(seq_num) + path[5] + str(idx) + ".npz"
+                        main(plk_path, Ppath, log_path=log_path, tau=tau, isKL=True, is_param=is_param
+                             , seq_num=seq_num)
+                    else:
+                        log_path = "./Log/Syn_data_log/non_parameter/non_parameter_with_KL/" + path[2][
+                                                                                               22:] + "idx" + str(
+                            idx) + "_tau" + str(tau) + "seq_num" + str(seq_num) + ".txt"
 
-        #     nohup python simulator.py >/dev/null 2>log &
+                        Ppath = path[4] + str(seq_num) + path[5] + str(idx) + ".npz"
+                        main(plk_path, Ppath, log_path=log_path, tau=tau, isKL=True, is_param=is_param
+                             , seq_num=seq_num)
+
+        #     nohup python main.py >/dev/null 2>log &
