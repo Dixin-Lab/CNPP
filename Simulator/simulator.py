@@ -212,7 +212,7 @@ def get_hp_from_syn_npz(zip_path, max_time, num_seq, index, output_dir, decay=0.
 
     if weighted:
         A1_w = torch.rand(n1, n1)
-        A1_w.uniform_(0.5,1)
+        A1_w.uniform_(0.5, 1)
         A1_w[A1 == 0] = 0
         A1 = A1_w
 
@@ -280,18 +280,15 @@ def get_hp_from_exp_pkl(path, max_time, num_seq=10000
 
 if __name__ == '__main__':  # 30 45 10
 
-    # get_hp_from_syn_npz(zip_path='Tpp_data/Syn_data/ER100.npz', max_time=3, num_seq=2000
-    #                     , index=0, output_dir='.'
-    #                     , decay=0.1, mu_type='max', weighted=True)
 
     for path in ['exp_10_10_2000_15_idx0.pkl'
-        ,'exp_50_50_2000_6_idx0.pkl','exp_100_100_2000_3_idx0.pkl']:
-        for i in range(1,5):
+        , 'exp_50_50_2000_6_idx0.pkl', 'exp_100_100_2000_3_idx0.pkl']:
+        for i in range(1, 5):
             if path == "exp_10_10_2000_15_idx0.pkl":
-                max_time=15
+                max_time = 15
             elif path == 'exp_50_50_2000_6_idx0.pkl':
-                max_time=6
+                max_time = 6
             else:
-                max_time=3
+                max_time = 3
             get_hp_from_exp_pkl(path=path, max_time=max_time, num_seq=2000
-                                    , index=i, output_dir='.', decay=0.1)
+                                , index=i, output_dir='.', decay=0.1)
