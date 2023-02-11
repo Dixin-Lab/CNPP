@@ -28,7 +28,8 @@ def compute_integral_biased(all_lambda, time, non_pad_mask):
     """ Log-likelihood of non-events, using linear interpolation. """
 
     diff_time = (time[:, 1:] - time[:, :-1]) * non_pad_mask[:, 1:]
-    diff_lambda = (all_lambda[:, 1:] + all_lambda[:, :-1]) * non_pad_mask[:, 1:]
+    diff_lambda = (all_lambda[:, 1:] +
+                   all_lambda[:, :-1]) * non_pad_mask[:, 1:]
 
     biased_integral = diff_lambda * diff_time
     result = 0.5 * biased_integral
@@ -42,21 +43,17 @@ def compute_integral_unbiased(model, process_idx, data, time, non_pad_mask, type
 
     diff_time = (time[:, 1:] - time[:, :-1]) * non_pad_mask[:, 1:]
     temp_time = diff_time.unsqueeze(2) * \
-                torch.rand([*diff_time.size(), num_samples], device=data.device)
+        torch.rand([*diff_time.size(), num_samples], device=data.device)
     temp_time /= (time[:, :-1] + 1).unsqueeze(2)
 
     temp_hid = model.linear_list[process_idx](data)[:, 1:, :]
     temp_hid = torch.sum(temp_hid * type_mask[:, 1:, :], dim=2, keepdim=True)
 
-    all_lambda = softplus(temp_hid + model.alpha * temp_time, torch.abs(model.beta))
-
-    # print("all_lambda shape",all_lambda.shape)
+    all_lambda = softplus(temp_hid + model.alpha *
+                          temp_time, torch.abs(model.beta))
     all_lambda = torch.sum(all_lambda, dim=2) / num_samples
 
-    # print("diff_time shape",diff_time.shape)
-    # print("all_lambda shape",all_lambda.shape)
     unbiased_integral = all_lambda * diff_time
-    # print("unbiased_integral shape", unbiased_integral.shape)
     return unbiased_integral
 
 
@@ -73,20 +70,17 @@ def log_likelihood(model, process_idx, data, time, types):
 
     all_hid = model.linear_list[process_idx](data)
     all_lambda = softplus(all_hid, torch.abs(model.beta))
-    #print("log_likelihood",all_lambda)
     type_lambda = torch.sum(all_lambda * type_mask, dim=2)
 
     # event log-likelihood
-
     event_ll = compute_event(type_lambda, non_pad_mask)
     event_ll = torch.sum(event_ll, dim=-1)
 
     # non-event log-likelihood, either numerical integration or MC integration
     #non_event_ll = compute_integral_biased(type_lambda, time, non_pad_mask)
-    non_event_ll = compute_integral_unbiased(model, process_idx, data, time, non_pad_mask, type_mask)
+    non_event_ll = compute_integral_unbiased(
+        model, process_idx, data, time, non_pad_mask, type_mask)
     non_event_ll = torch.sum(non_event_ll, dim=-1)
-    # print("non_event_ll shape",non_event_ll.shape)
-    # print("event_ll shape",event_ll.shape)
 
     return event_ll, non_event_ll
 
@@ -99,28 +93,27 @@ def type_loss(prediction, types, loss_func):
     prediction = prediction[:, :-1, :]
 
     pred_type = torch.max(prediction, dim=-1)[1]
-    # print("pred_type",pred_type.shape,pred_type)
-    # print("truth", truth.shape, truth)
     correct_num = torch.sum(pred_type == truth)
-    # print("correct_num",correct_num)
-    # print(torch.sum(pred_type.view(-1)==truth.view(-1)))
-    true_list=[]
-    pred_list=[]
+
+    true_list = []
+    pred_list = []
     for i in range(truth.shape[0]):
         pos_array = torch.nonzero(truth[i] == -1)
         if pos_array.shape[0] == 0:
             true_list.extend(list(truth[i].cpu().detach().numpy()))
             pred_list.extend(list(pred_type[i].cpu().detach().numpy()))
         else:
-            #print("pos_array[0]",pos_array[0])
-            true_list.extend(list(truth[i][:pos_array[0]].cpu().detach().numpy()))
-            pred_list.extend(list(pred_type[i][:pos_array[0]].cpu().detach().numpy()))
+            true_list.extend(
+                list(truth[i][:pos_array[0]].cpu().detach().numpy()))
+            pred_list.extend(
+                list(pred_type[i][:pos_array[0]].cpu().detach().numpy()))
+                
     # compute cross entropy loss
     if isinstance(loss_func, LabelSmoothingLoss):
         loss = loss_func(prediction, truth)
     else:
         loss = loss_func(prediction.transpose(1, 2), truth)
-    # print("type_loss loss",loss,"loss shape",loss.shape,"sum loss",torch.sum(loss))
+
     loss_r = torch.sum(loss)
 
     return loss_r, correct_num, true_list, pred_list
@@ -165,7 +158,8 @@ class LabelSmoothingLoss(nn.Module):
 
         target[target.eq(self.ignore_index)] = 0
         one_hot = F.one_hot(target, num_classes=self.num_classes).float()
-        one_hot = one_hot * (1 - self.eps) + (1 - one_hot) * self.eps / self.num_classes
+        one_hot = one_hot * (1 - self.eps) + (1 - one_hot) * \
+            self.eps / self.num_classes
 
         log_prb = F.log_softmax(output, dim=-1)
         loss = -(one_hot * log_prb).sum(dim=-1)

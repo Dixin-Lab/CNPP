@@ -3,7 +3,6 @@ import torch
 import torch.utils.data
 from torch.distributions import categorical, exponential, uniform
 from typing import Dict, List, Tuple
-from constant import PAD
 import networkx as nx
 import pickle
 import scipy.sparse as sp
@@ -279,67 +278,6 @@ def get_hp_from_exp_pkl(path, max_time, num_seq=10000
     save_pkl(data_dict, params1, params2, pmat, max_time, num_seq, output_dir=output_dir, index=index)
 
 
-def get_CoraGraphDataset():
-    import dgl.data
-    import torch
-    import random
-    dataset = dgl.data.CoraGraphDataset()
-    data = dataset[0]
-    adj = data.adj().to_dense()
-    dim = adj.shape[0]
-
-    print(torch.sum(adj))
-    edge = torch.argwhere(adj)
-    non_edge = (adj == 0).nonzero()
-
-    edge_dir_list = []
-    for item in edge:
-        if item[0] > item[1]:
-            edge_dir_list.append(item)
-
-    non_edge_dir_list = []
-    for item in non_edge:
-        if item[0] > item[1]:
-            non_edge_dir_list.append(item)
-
-    random.shuffle(non_edge_dir_list)
-    random.shuffle(edge_dir_list)
-
-    edge_dir_list_1 = edge_dir_list + non_edge_dir_list[:528]
-    edge_dir_list_2 = edge_dir_list[:4547]
-
-    A1 = torch.zeros((2708, 2708))
-    A2 = torch.zeros((2708, 2708))
-
-    for item in edge_dir_list_1:
-        i, o = item[0], item[1]
-        A1[i, o] = 1
-        A1[o, i] = 1
-
-    for item in edge_dir_list_2:
-        i, o = item[0], item[1]
-        A2[i, o] = 1
-        A2[o, i] = 1
-
-    idx = torch.randperm(dim)
-
-    # infect1=torch.tril(infect1)
-    A2 = A2[idx, :]
-    A2 = A2[:, idx]
-
-    pmat = torch.eye(dim)
-    pmat = pmat[:, idx]
-
-    edge1 = torch.argwhere(A1).T.numpy()
-    edge2 = torch.argwhere(A2).T.numpy()
-    print(edge1.shape[1])
-    print(edge2.shape[1])
-
-    gnd = torch.argwhere(pmat)
-
-    np.savez("Cora2708" + ".npz", edge_index1=edge1, edge_index2=edge2, gnd=gnd)
-
-
 if __name__ == '__main__':  # 30 45 10
 
     # get_hp_from_syn_npz(zip_path='Tpp_data/Syn_data/ER100.npz', max_time=3, num_seq=2000
@@ -357,27 +295,3 @@ if __name__ == '__main__':  # 30 45 10
                 max_time=3
             get_hp_from_exp_pkl(path=path, max_time=max_time, num_seq=2000
                                     , index=i, output_dir='.', decay=0.1)
-
-    # for path in ['Cora2708.npz','phone-email_0.1.npz','Arenas_noise0.05_0.1.npz']:
-    #     for i in range(5):
-    #         if path == "Cora2708.npz":
-    #             max_time=2.3
-    #         elif path == 'phone-email_0.1.npz':
-    #             max_time=0.5
-    #         else:
-    #             max_time=1
-    #         print(path)
-    #         get_params_from_syn_npz(zip_path=path, max_time=max_time, num_seq=10000
-    #                                 , index=i, output_dir='.', decay=0.1, mu_type='max')
-
-    for path in ['Cora2708.npz','phone-email_0.1.npz','Arenas_noise0.05_0.1.npz']:
-        for i in range(1,5):
-            if path == "Cora2708.npz":
-                max_time=2.3
-            elif path == 'phone-email_0.1.npz':
-                max_time=0.5
-            else:
-                max_time=1
-            print(path)
-            get_hp_from_syn_npz(zip_path=path, max_time=max_time, num_seq=10000
-                                    , index=i, output_dir='.', decay=0.1, mu_type='max')

@@ -1,3 +1,4 @@
+import random
 import argparse
 import numpy as np
 import pickle
@@ -46,13 +47,19 @@ def prepare_dataloader(opt, train_ratio=0.8):
     train_len1 = int(len1 * train_ratio)
     test_len1 = int(len1 * (1 - train_ratio) / 2)
 
-    trainloader_0 = get_dataloader(data=total_data0[:train_len0], batch_size=opt.batch_size)
-    trainloader_1 = get_dataloader(data=total_data1[:train_len1], batch_size=opt.batch_size)
-    testloader_0 = get_dataloader(data=total_data0[train_len0:test_len0 + train_len0], batch_size=opt.batch_size)
-    testloader_1 = get_dataloader(data=total_data1[train_len1:test_len1 + train_len1], batch_size=opt.batch_size)
+    trainloader_0 = get_dataloader(
+        data=total_data0[:train_len0], batch_size=opt.batch_size)
+    trainloader_1 = get_dataloader(
+        data=total_data1[:train_len1], batch_size=opt.batch_size)
+    testloader_0 = get_dataloader(
+        data=total_data0[train_len0:test_len0 + train_len0], batch_size=opt.batch_size)
+    testloader_1 = get_dataloader(
+        data=total_data1[train_len1:test_len1 + train_len1], batch_size=opt.batch_size)
 
-    valloader_0 = get_dataloader(data=total_data0[test_len0 + train_len0:], batch_size=opt.batch_size)
-    valloader_1 = get_dataloader(data=total_data1[test_len1 + train_len1:], batch_size=opt.batch_size)
+    valloader_0 = get_dataloader(
+        data=total_data0[test_len0 + train_len0:], batch_size=opt.batch_size)
+    valloader_1 = get_dataloader(
+        data=total_data1[test_len1 + train_len1:], batch_size=opt.batch_size)
 
     return valloader_0, valloader_1, trainloader_0, trainloader_1, testloader_0, testloader_1, num_types, params1, params2, pmat
 
@@ -80,9 +87,11 @@ def train_epoch(model, training_data_list, optimizer, pred_loss_func, opt):
     total_num_event_1 = 0  # number of total events
     total_num_pred_1 = 0  # number of predictions
 
-    training_data_iters = [iter(dataloader) for dataloader in training_data_list]
+    training_data_iters = [iter(dataloader)
+                           for dataloader in training_data_list]
 
-    training_data_batch_nums = min([len(dataloader) for dataloader in training_data_list])
+    training_data_batch_nums = min(
+        [len(dataloader) for dataloader in training_data_list])
 
     print(training_data_batch_nums)
 
@@ -102,23 +111,27 @@ def train_epoch(model, training_data_list, optimizer, pred_loss_func, opt):
 
             batch = next(training_data_iters[process_idx])
             """ prepare data """
-            event_time, time_gap, event_type = map(lambda x: x.to(opt.device), batch)
+            event_time, time_gap, event_type = map(
+                lambda x: x.to(opt.device), batch)
 
             enc_out, prediction = model(process_idx, event_type, event_time)
 
             """ backward """
             # negative log-likelihood
-            event_ll, non_event_ll = model.log_likelihood(process_idx, enc_out, event_time, event_type)
+            event_ll, non_event_ll = model.log_likelihood(
+                process_idx, enc_out, event_time, event_type)
             event_loss = -torch.sum(event_ll - non_event_ll)
 
             # type prediction
-            pred_loss, pred_num_event, _, _ = type_loss(prediction[0], event_type, pred_loss_func[process_idx])
+            pred_loss, pred_num_event, _, _ = type_loss(
+                prediction[0], event_type, pred_loss_func[process_idx])
 
             # time prediction
             se = time_loss(prediction[1], event_time)
 
             # SE is usually large, scale it to stabilize training
-            scale_time_loss = event_type.ne(PAD).sum().item() - event_time.shape[0]
+            scale_time_loss = event_type.ne(
+                PAD).sum().item() - event_time.shape[0]
             scale_nll_loss = event_type.ne(PAD).sum().item()
 
             # 3 kinds of loss
@@ -146,7 +159,8 @@ def train_epoch(model, training_data_list, optimizer, pred_loss_func, opt):
             total_event_rate += pred_num_event.item()
             total_num_event += event_type.ne(PAD).sum().item()
             # we do not predict the first event
-            total_num_pred += event_type.ne(PAD).sum().item() - event_time.shape[0]
+            total_num_pred += event_type.ne(PAD).sum().item() - \
+                event_time.shape[0]
 
             """ note keeping process_idx """
             if process_idx == 0:
@@ -155,14 +169,16 @@ def train_epoch(model, training_data_list, optimizer, pred_loss_func, opt):
                 total_event_rate_0 += pred_num_event.item()
                 total_num_event_0 += event_type.ne(PAD).sum().item()
                 # we do not predict the first event
-                total_num_pred_0 += event_type.ne(PAD).sum().item() - event_time.shape[0]
+                total_num_pred_0 += event_type.ne(PAD).sum().item() - \
+                    event_time.shape[0]
             else:
                 total_event_ll_1 += -event_loss.item()
                 total_time_se_1 += se.item()
                 total_event_rate_1 += pred_num_event.item()
                 total_num_event_1 += event_type.ne(PAD).sum().item()
                 # we do not predict the first event
-                total_num_pred_1 += event_type.ne(PAD).sum().item() - event_time.shape[0]
+                total_num_pred_1 += event_type.ne(PAD).sum().item() - \
+                    event_time.shape[0]
 
         if opt.isKL:
 
@@ -174,7 +190,8 @@ def train_epoch(model, training_data_list, optimizer, pred_loss_func, opt):
 
             ot_loss = KL_div(trans.log(), model.encoder.event_emb.P)
 
-            loss = batch_event_loss / batch_num_event + ot_loss * opt.KL_tau  # + batch_pred_loss / batch_num_pred \
+            loss = batch_event_loss / batch_num_event + ot_loss * \
+                opt.KL_tau  # + batch_pred_loss / batch_num_pred \
             # + batch_time_loss / batch_num_pred
         else:
 
@@ -234,9 +251,11 @@ def eval_epoch(model, validation_data_list, pred_loss_func, opt):
         # training_data_list: [dataloader0, dataloader1]
         # if process_idx == 1:     event_type -= model.num_types[0] !!!
 
-        validation_data_iters = [iter(dataloader) for dataloader in validation_data_list]
+        validation_data_iters = [iter(dataloader)
+                                 for dataloader in validation_data_list]
 
-        validation_data_batch_nums = min([len(dataloader) for dataloader in validation_data_list])
+        validation_data_batch_nums = min(
+            [len(dataloader) for dataloader in validation_data_list])
 
         print(validation_data_batch_nums)
 
@@ -246,13 +265,16 @@ def eval_epoch(model, validation_data_list, pred_loss_func, opt):
 
                 batch = next(validation_data_iters[process_idx])
                 """ prepare data """
-                event_time, time_gap, event_type = map(lambda x: x.to(opt.device), batch)
+                event_time, time_gap, event_type = map(
+                    lambda x: x.to(opt.device), batch)
 
                 """ forward """
-                enc_out, prediction = model(process_idx, event_type, event_time)
+                enc_out, prediction = model(
+                    process_idx, event_type, event_time)
 
                 """ compute loss """
-                event_ll, non_event_ll = model.log_likelihood(process_idx, enc_out, event_time, event_type)
+                event_ll, non_event_ll = model.log_likelihood(
+                    process_idx, enc_out, event_time, event_type)
                 event_loss = -torch.sum(event_ll - non_event_ll)
 
                 # _, pred_num, true_list, pred_list = type_loss(prediction[0], event_type, pred_loss_func[process_idx])
@@ -272,7 +294,8 @@ def eval_epoch(model, validation_data_list, pred_loss_func, opt):
                 # total_time_se += se.item()
                 # total_event_rate += pred_num.item()
                 total_num_event += event_type.ne(PAD).sum().item()
-                total_num_pred += event_type.ne(PAD).sum().item() - event_time.shape[0]
+                total_num_pred += event_type.ne(PAD).sum().item() - \
+                    event_time.shape[0]
 
                 """ note keeping process_idx """
                 if process_idx == 0:
@@ -281,14 +304,16 @@ def eval_epoch(model, validation_data_list, pred_loss_func, opt):
                     # total_event_rate_0 += pred_num.item()
                     total_num_event_0 += event_type.ne(PAD).sum().item()
                     # we do not predict the first event
-                    total_num_pred_0 += event_type.ne(PAD).sum().item() - event_time.shape[0]
+                    total_num_pred_0 += event_type.ne(
+                        PAD).sum().item() - event_time.shape[0]
                 else:
                     total_event_ll_1 += -event_loss.item()
                     # total_time_se_1 += se.item()
                     # total_event_rate_1 += pred_num.item()
                     total_num_event_1 += event_type.ne(PAD).sum().item()
                     # we do not predict the first event
-                    total_num_pred_1 += event_type.ne(PAD).sum().item() - event_time.shape[0]
+                    total_num_pred_1 += event_type.ne(
+                        PAD).sum().item() - event_time.shape[0]
 
     rmse = np.sqrt(total_time_se / total_num_pred)
     rmse_0 = np.sqrt(total_time_se_0 / total_num_pred_0)
@@ -337,14 +362,16 @@ def train(model, training_data_list, validation_data_list, test_data_list, optim
         print('[ Epoch', epoch, ']')
 
         start = time.time()
-        train_event, train_type, train_time = train_epoch(model, training_data_list, optimizer, pred_loss_func, opt)
+        train_event, train_type, train_time = train_epoch(
+            model, training_data_list, optimizer, pred_loss_func, opt)
         print('  -Total (Training)    loglikelihood: {ll: 8.5f}, '
               'accuracy: {type: 8.5f}, RMSE: {rmse: 8.5f}, '
               'elapse: {elapse:3.3f} min'
               .format(ll=train_event, type=train_type, rmse=train_time, elapse=(time.time() - start) / 60))
 
         start = time.time()
-        valid_event, valid_type, valid_time, val_f1 = eval_epoch(model, validation_data_list, pred_loss_func, opt)
+        valid_event, valid_type, valid_time, val_f1 = eval_epoch(
+            model, validation_data_list, pred_loss_func, opt)
         print('  -Total (Valid)     loglikelihood: {ll: 8.5f}, '
               'accuracy: {type: 8.5f}, RMSE: {rmse: 8.5f}, '
               'elapse: {elapse:3.3f} min'
@@ -357,7 +384,8 @@ def train(model, training_data_list, validation_data_list, test_data_list, optim
               'Maximum accuracy: {pred: 8.5f}, Minimum RMSE: {rmse: 8.5f}'
               .format(event=max(valid_event_losses), pred=max(valid_pred_losses), rmse=min(valid_rmse)))
 
-        test_event, test_type, test_time, test_f1 = eval_epoch(model, test_data_list, pred_loss_func, opt)
+        test_event, test_type, test_time, test_f1 = eval_epoch(
+            model, test_data_list, pred_loss_func, opt)
         print('  -Total (Testing)     loglikelihood: {ll: 8.5f}, '
               'accuracy: {type: 8.5f}, RMSE: {rmse: 8.5f}, '
               'elapse: {elapse:3.3f} min'
@@ -432,9 +460,9 @@ def main(path0, path1, log_path, tau, isKL=True, is_param=False):
 
     """ prepare dataloader """
     valloader_0, valloader_1, \
-    trainloader_0, trainloader_1, \
-    testloader_0, testloader_1, \
-    num_types, params1, params2, pmat = prepare_dataloader(opt)
+        trainloader_0, trainloader_1, \
+        testloader_0, testloader_1, \
+        num_types, params1, params2, pmat = prepare_dataloader(opt)
 
     training_data_list = [trainloader_0, trainloader_1]
     validation_data_list = [valloader_0, valloader_1]
@@ -469,19 +497,20 @@ def main(path0, path1, log_path, tau, isKL=True, is_param=False):
     """ prediction loss function, either cross entropy or label smoothing """
     # TO DO
     if opt.smooth > 0:
-        pred_loss_func0 = LabelSmoothingLoss(opt.smooth, num_types[0], ignore_index=-1)
-        pred_loss_func1 = LabelSmoothingLoss(opt.smooth, num_types[1], ignore_index=-1)
+        pred_loss_func0 = LabelSmoothingLoss(
+            opt.smooth, num_types[0], ignore_index=-1)
+        pred_loss_func1 = LabelSmoothingLoss(
+            opt.smooth, num_types[1], ignore_index=-1)
         pred_loss_func = [pred_loss_func0, pred_loss_func1]
     else:
-        pred_loss_func0 = nn.CrossEntropyLoss(ignore_index=-1, reduction='none')
-        pred_loss_func1 = nn.CrossEntropyLoss(ignore_index=-1, reduction='none')
+        pred_loss_func0 = nn.CrossEntropyLoss(
+            ignore_index=-1, reduction='none')
+        pred_loss_func1 = nn.CrossEntropyLoss(
+            ignore_index=-1, reduction='none')
         pred_loss_func = [pred_loss_func0, pred_loss_func1]
 
     train(model, training_data_list, validation_data_list, test_data_list, optimizer, scheduler, pred_loss_func, opt,
           gnd_pair)
-
-
-import random
 
 
 def setup_seed(seed):
@@ -542,16 +571,9 @@ if __name__ == '__main__':
     #               , "./Tpp_data/Real_data/prior/P_1000_prior_0.01_10000_10000_0.5_idx_")
     # ]:
     for path in [
-        ("./Tpp_data/Syn_data/unweighted/exp/exp_10_10_2000_15_idx", 15
-         , 'lambda1_lambda2_const_10_2000_15_'
-         , "./Tpp_data/Syn_data/unweighted/prior/P_10_prior_0.0001_10000_2000_15_idx_")
-        ,
-        ("./Tpp_data/Syn_data/unweighted/exp/exp_100_100_2000_3_idx", 3
-         , 'lambda1_lambda2_const_100_2000_3_'
-         , "./Tpp_data/Syn_data/unweighted/prior/P_100_prior_0.0001_10000_2000_3_idx_")
-        , ("./Tpp_data/Syn_data/unweighted/exp/exp_50_50_2000_6_idx", 6
-           , 'lambda1_lambda2_const_50_2000_6_'
-           , "./Tpp_data/Syn_data/unweighted/prior/P_50_prior_0.0001_10000_2000_6_idx_")]:
+        ("./Tpp_data/Syn_data/unweighted/exp/exp_10_10_2000_15_idx", 15, 'lambda1_lambda2_const_10_2000_15_',
+         "./Tpp_data/Syn_data/unweighted/prior/P_10_prior_0.0001_10000_2000_15_idx_"),
+            ("./Tpp_data/Syn_data/unweighted/exp/exp_100_100_2000_3_idx", 3, 'lambda1_lambda2_const_100_2000_3_', "./Tpp_data/Syn_data/unweighted/prior/P_100_prior_0.0001_10000_2000_3_idx_"), ("./Tpp_data/Syn_data/unweighted/exp/exp_50_50_2000_6_idx", 6, 'lambda1_lambda2_const_50_2000_6_', "./Tpp_data/Syn_data/unweighted/prior/P_50_prior_0.0001_10000_2000_6_idx_")]:
 
         tau = 100
         for idx in range(5):
@@ -559,4 +581,5 @@ if __name__ == '__main__':
             log_path = "./Log/Syn_data_log/parameter/parameter_with_KL/" + path[2][22:] + "idx" + str(
                 idx) + "_tau" + str(tau) + ".txt"
             Ppath = path[3] + str(idx) + ".npz"
-            main(plk_path, Ppath, log_path=log_path, tau=tau, isKL=True, is_param=True)
+            main(plk_path, Ppath, log_path=log_path,
+                 tau=tau, isKL=True, is_param=True)

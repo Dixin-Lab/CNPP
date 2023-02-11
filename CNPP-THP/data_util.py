@@ -2,10 +2,10 @@
 import numpy as np
 import torch
 import torch.utils.data
-from typing import Dict, List, Tuple
+from typing import Dict, List
 from constant import PAD
 
-#define how to get event data
+
 class EventData(torch.utils.data.Dataset):
     """ Event stream dataset. """
 
@@ -16,7 +16,8 @@ class EventData(torch.utils.data.Dataset):
         """
 
         self.time = [seq['ti'].tolist() for seq in sequences]
-        self.time_gap = [seq['time_since_last_event'].tolist() for seq in sequences]
+        self.time_gap = [seq['time_since_last_event'].tolist()
+                         for seq in sequences]
         # plus 1 since there could be event type 0, but we use 0 as padding
         self.event_type = [(seq['ci'] + 1).tolist() for seq in sequences]
         self.length = len(sequences)
@@ -76,5 +77,3 @@ def get_dataloader(data, batch_size, shuffle=True):
         shuffle=shuffle
     )
     return dl
-
-
