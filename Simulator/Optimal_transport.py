@@ -38,16 +38,7 @@ def get_prior_P(path0, path1, epsilon=0.0001, numItermax=5000, max_time=0.0, num
 
 
 
-def prior_accuracy(path0, path1):
-    data, num_types = load_data(path0)
-    pmat = data['pmat']
 
-    P_prior = np.load(path1)['P']
-    print(np.sum(P_prior))
-    gnd_pair = np.argwhere(pmat.numpy()).astype(np.int32)
-    from metric import acc_score_P
-    for topk in [1, 3, 5, 10, 30, 50]:  # ,30,50
-        acc_score_P(P_prior, gnd=gnd_pair[:, ], topk=topk)
 
 
 
@@ -127,9 +118,7 @@ def get_tpp_statistics_num_seq(path="./exp_5313_5120_10000_0.05.pkl", num_seq=10
     from sklearn.metrics.pairwise import euclidean_distances
 
     cost = euclidean_distances(lambda_1, lambda_2)
-    print("lambda_1:", lambda_1)
-    print("lambda_2:", lambda_2)
-    print("cost", cost)
+
     np.savez("lambda1_lambda2_const_" + str(len(lambda_1)) + "_" + str(num_seq) + "_" + str(max_time) + ".npz",
              lambda_1=lambda_1, lambda_2=lambda_2, cost=cost)
 
@@ -148,6 +137,5 @@ if __name__ == "__main__":
 
         get_prior_P(path0=plk_path, path1=abpath, epsilon=0.0001,
                     numItermax=10000, max_time=max_time, num_seq=10000, index=idx)
-
         Ppath = path[3]+str(idx)+".npz"
-        prior_accuracy(path0=plk_path, path1=Ppath)
+
