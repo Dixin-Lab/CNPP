@@ -5,15 +5,10 @@ This package includes the implementation of our work **"Coupled Point Process-ba
 # Dependencies
 
 - Python 3.9.7
-
 - PyTorch 1.11.0
-
 - networkx
-
 - scipy
-
 - numpy 
-
 - matplotlib
 
   
