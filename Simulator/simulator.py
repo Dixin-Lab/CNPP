@@ -7,6 +7,7 @@ import networkx as nx
 import pickle
 import scipy.sparse as sp
 from networkx import erdos_renyi_graph
+import argparse
 
 
 # simulator
@@ -212,7 +213,7 @@ def get_hp_from_syn_npz(zip_path, max_time, num_seq, index, output_dir, decay=0.
 
     if weighted:
         A1_w = torch.rand(n1, n1)
-        A1_w.uniform_(0.5,1)
+        A1_w.uniform_(0.5, 1)
         A1_w[A1 == 0] = 0
         A1 = A1_w
 
@@ -278,20 +279,28 @@ def get_hp_from_exp_pkl(path, max_time, num_seq=10000
     save_pkl(data_dict, params1, params2, pmat, max_time, num_seq, output_dir=output_dir, index=index)
 
 
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-zip_path', type=str, default='ER10.npz')
+    parser.add_argument('-max_time', type=float, default=30)
+
+    parser.add_argument('-num_seq', type=int, default=2000)
+    parser.add_argument('-index', type=int, default=0, help='give a index to the simulate tpp data')
+
+    parser.add_argument('-out_put', type=str, default='.')
+
+    parser.add_argument('-decay', type=float, default=0.1, help='decay constant for multivariate hawkes process')
+
+    parser.add_argument('-mu_type', type=str, default='max', help='define the way to calculate background intensity')
+
+    parser.add_argument('-weighted', type=bool, default=True, help='give a weight to the edge of the graph')
+
+    opt = parser.parse_known_args()[0]
+    get_hp_from_syn_npz(zip_path=opt.zip_path
+                        , max_time=opt.max_time, num_seq=opt.num_seq
+                        , index=opt.index, output_dir=opt.output_dir
+                        , decay=opt.decay, mu_type=opt.mu_type, weighted=opt.weighted)
+
+
 if __name__ == '__main__':  # 30 45 10
-
-    # get_hp_from_syn_npz(zip_path='Tpp_data/Syn_data/ER100.npz', max_time=3, num_seq=2000
-    #                     , index=0, output_dir='.'
-    #                     , decay=0.1, mu_type='max', weighted=True)
-
-    for path in ['exp_10_10_2000_15_idx0.pkl'
-        ,'exp_50_50_2000_6_idx0.pkl','exp_100_100_2000_3_idx0.pkl']:
-        for i in range(1,5):
-            if path == "exp_10_10_2000_15_idx0.pkl":
-                max_time=15
-            elif path == 'exp_50_50_2000_6_idx0.pkl':
-                max_time=6
-            else:
-                max_time=3
-            get_hp_from_exp_pkl(path=path, max_time=max_time, num_seq=2000
-                                    , index=i, output_dir='.', decay=0.1)
+    main()
