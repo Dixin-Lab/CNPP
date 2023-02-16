@@ -15,6 +15,6 @@ This package includes the implementation of our work **"Coupled Point Process-ba
 
 # Run the code
 
-1. Generate event sequences according to the network structure (**Simulator/simulator.py**)
-2. Get an intensity-based prior of alignment matrix (**Simulator/Optimal_transport.py**)
+1. Generate event sequences according to the network structure (**simulator/simulator.py**)
+2. Get an intensity-based prior of alignment matrix (**simulator/get_prior.py**)
 3. Run our sequential behavior-driven network alignment method (**CNPP-SAHP/main.py** or **CNPP-THP/main.py**)
