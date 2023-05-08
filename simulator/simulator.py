@@ -82,13 +82,11 @@ def simulate_ogata_thinning(mu: torch.Tensor,
             exp_dist = exponential.Exponential(rate=lambda_ts_all)
 
         if sequence['ci'] is not None:
-            print(len(sequence['ci']))
-
             seqs_len.append(len(sequence['ci']))
             seqs.append(sequence)
 
-    print('Seqs_len: ', seqs_len)
-    print('Seqs: ', seqs)
+    # print('Seqs_len: ', seqs_len)
+    # print('Seqs: ', seqs)
     return seqs, seqs_len
 
 
@@ -103,7 +101,6 @@ def synthetic_hawkes_parameters(dim: int = 10, thres: float = 0.5) -> Tuple[Dict
 
     mu1 = torch.sum(infect1, dim=0) / torch.sum(infect1)
 
-    print("torch.sum(infect1)", torch.sum(infect1))
     infect1 = 0.8 * infect1 / torch.linalg.svdvals(infect1)[0]
     idx = torch.randperm(dim)
     mu2 = mu1[idx]
@@ -119,8 +116,6 @@ def synthetic_hawkes_parameters(dim: int = 10, thres: float = 0.5) -> Tuple[Dict
 def get_synthetic_graph(dim: int = 10, thres: float = 0.5):
     ER = erdos_renyi_graph(dim, thres, seed=None, directed=False)
     infect1 = nx.to_numpy_array(ER)
-    print("infect1", infect1)
-    print(np.sum(infect1))
 
     idx = np.random.permutation(dim)
     infect2 = infect1[idx, :]
@@ -197,15 +192,13 @@ def prepare_dataloader(path):
 
 
 def get_hp_from_syn_npz(zip_path, max_time, num_seq, index, output_dir, decay=0.1, mu_type='max', weighted=False):
-    print(zip_path, max_time)
     data = np.load(zip_path)
     mu1 = None
     mu2 = None
 
     row = data['edge_index1'].T[:, 0]
     col = data['edge_index1'].T[:, 1]
-    print(row)
-    print(col)
+
     # no isolated
     n1 = 1 + np.max(data['edge_index1'])
     A1 = sp.coo_matrix((np.ones(data['edge_index1'].shape[1]), (row, col)), shape=(n1, n1)).toarray()
@@ -254,11 +247,6 @@ def get_hp_from_syn_npz(zip_path, max_time, num_seq, index, output_dir, decay=0.
     pmat = sp.coo_matrix((np.ones(data['gnd'].shape[0]), (row, col)), shape=(n1, n2)).toarray()
     pmat = torch.from_numpy(pmat)
 
-    print("mu1", mu1)
-    print("mu2", mu2)
-    print("A1", A1)
-    print("A2", A2)
-
     data_dict = generate_synthetic_tpps_from_graph_data(params1, params2,
                                                         num_seq=num_seq, max_time=max_time,
                                                         w=decay)
@@ -281,13 +269,13 @@ def get_hp_from_exp_pkl(path, max_time, num_seq=10000
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('-zip_path', type=str, default='ER10.npz')
+    parser.add_argument('-zip_path', type=str, default='../synthetic_data/unweighted_directed_ER10.npz')
     parser.add_argument('-max_time', type=float, default=30)
 
-    parser.add_argument('-num_seq', type=int, default=2000)
+    parser.add_argument('-num_seq', type=int, default=100)
     parser.add_argument('-index', type=int, default=0, help='give a index to the simulate tpp data')
 
-    parser.add_argument('-out_put', type=str, default='.')
+    parser.add_argument('-output_dir', type=str, default='.')
 
     parser.add_argument('-decay', type=float, default=0.1, help='decay constant for multivariate hawkes process')
 

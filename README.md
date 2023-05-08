@@ -1,6 +1,6 @@
 # CNPP
 
-This package includes the implementation of our work **"Coupled Point Process-based Sequence Modeling for Privacy-preserving Network Alignment"**
+The official github for IJCAI 2023 paper **"Coupled Point Process-based Sequence Modeling for Privacy-preserving Network Alignment"**
 
 # Dependencies
 
@@ -10,8 +10,6 @@ This package includes the implementation of our work **"Coupled Point Process-ba
 - scipy
 - numpy 
 - matplotlib
-
-  
 
 # Run the code
 
